@@ -16,7 +16,7 @@ To run: copy `trespass.exe` into your installed game directory (where the .GRF d
 
 The engine compiles on **Windows XP SP3 + Visual Studio 6.0 SP6**. No DirectX SDK is required — all headers and libs are bundled.
 
-See [`BUILD.md`](BUILD.md) for the full toolchain setup, build commands, and details on each source fix.
+See [`BUILD.md`](BUILD.md) for the full toolchain setup, build commands, and details on each source fix. Additional project notes and research are in [`docs/`](docs/).
 
 ## Fixes Applied
 
