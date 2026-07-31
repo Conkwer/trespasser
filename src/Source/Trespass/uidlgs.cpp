@@ -1128,11 +1128,34 @@ void COptionsWnd::UIButtonUp(CUIButton * pbutton)
 
 CInGameOptionsWnd::CInGameOptionsWnd(CUIManager * puimgr) : CUIDlg(puimgr)
 {
+	// If ESC is physically down when the dialog opens, suppress the
+	// first ESC key-up to prevent the menu from closing immediately.
+	m_bEscapeSuppressed = (GetAsyncKeyState(VK_ESCAPE) < 0);
 }
 
 CInGameOptionsWnd::~CInGameOptionsWnd()
 {
     g_CTPassGlobals.FreeMenuAudio();
+}
+
+
+void CInGameOptionsWnd::OnKey(UINT vk, BOOL fDown, int cRepeat, UINT flags)
+{
+	if (vk == VK_ESCAPE)
+	{
+		if (fDown)
+		{
+			// New ESC press — allow close on release
+			m_bEscapeSuppressed = false;
+		}
+		else if (m_bEscapeSuppressed)
+		{
+			// Consume the ESC release that opened this dialog
+			m_bEscapeSuppressed = false;
+			return;
+		}
+	}
+	CUIDlg::OnKey(vk, fDown, cRepeat, flags);
 }
 
 

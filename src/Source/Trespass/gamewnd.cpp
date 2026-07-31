@@ -574,7 +574,6 @@ void CGameWnd::OnKey(UINT vk, BOOL fDown, int cRepeat, UINT flags)
                 BOOL                bContinue = TRUE;
 
                 
-					ClearInputState(true);
 
 					SetupGameStoppage();
 
