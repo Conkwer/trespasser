@@ -574,18 +574,7 @@ void CGameWnd::OnKey(UINT vk, BOOL fDown, int cRepeat, UINT flags)
                 BOOL                bContinue = TRUE;
 
                 
-					// Flush pending ESC key-up to prevent instant menu close.
-					// The dialog handles ESC on key-up, and the release from
-					// this same press would immediately close it.
-					MSG msg;
-					while (GetAsyncKeyState(VK_ESCAPE) < 0)
-					{
-						if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-						{
-							TranslateMessage(&msg);
-							DispatchMessage(&msg);
-						}
-					}
+					ClearInputState(true);
 
 					SetupGameStoppage();
 
