@@ -51,6 +51,8 @@ The source code was shared unofficially by DreamWorks Interactive developers. No
 
 ## Solution Structure
 
+> Source: Fabien Sanglard, [*Jurassic Park: Trespasser Source Code Review*](http://fabiensanglard.net/trespasser) (2014).
+
 The workspace contains 23 sub-projects (~300K lines of C++ across 1241 files):
 
 | Project | Generates | Description |
