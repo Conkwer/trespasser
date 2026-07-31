@@ -81,4 +81,4 @@ The workspace contains 23 sub-projects (~300K lines of C++ across 1241 files).
 
 ## Disclaimer
 
-This source code was originally shared by the development team for community preservation. It is provided for **educational and preservation purposes only**. No game assets, copyrighted materials, or proprietary data are included. This is not a commercial project. Use at your own risk.
+The source code surfaced within the community after many years of preservation efforts. This repository exists for **educational and archival purposes only**. No game assets, copyrighted materials, or proprietary data are included. This is not a commercial project. If you hold rights to any content here and wish it removed, open an issue.
