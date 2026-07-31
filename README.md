@@ -1,10 +1,8 @@
-# Jurassic Park: Trespasser — Source Port
+# Trespasser
 
-This is the original leaked Trespasser source code (v1.0 retail, 1998), compiled and gradually fixed for modern systems.
+This is a preservation of the original Trespasser engine source code (v1.0 retail, 1998), compiled and maintained with fixes for modern systems.
 
-## What Works
-
-The game compiles on **Windows XP SP3 + Visual Studio 6.0 SP6** with zero errors. No DirectX SDK is needed — all headers and libs are bundled in the source.
+**Game assets are not included.** You must own the original CD (v1.0 retail, 1998) and copy the data files to use the compiled binary.
 
 ## Quick Start
 
@@ -12,7 +10,11 @@ Pre-compiled binaries are in [`dist/`](dist/):
 - `trespass.exe` — the game
 - `GUIApp.exe` — developer debug shell (requires 16-bit color mode)
 
+To run: copy `trespass.exe` into your installed game directory (where the .GRF data files are), or copy the data files alongside the binary.
+
 ## Build
+
+The engine compiles on **Windows XP SP3 + Visual Studio 6.0 SP6**. No DirectX SDK is required — all headers and libs are bundled.
 
 See [`BUILD.md`](BUILD.md) for the full toolchain setup, build commands, and details on each source fix.
 
@@ -32,28 +34,12 @@ See [`BUILD.md`](BUILD.md) for the full toolchain setup, build commands, and det
 | Audio | DirectSound3D with EAX/A3D (native) |
 | Modern audio | OpenAL replacement pending |
 | Config storage | Windows registry (INI replacement pending) |
-| OpenTrespasser comparison | Their CMake modernization is abandoned; we build with the original toolchain |
-
-## Requirements
-
-- v1.0 retail game data (v1.1 patched data causes version mismatch)
-- Windows XP or newer (Win11 + Compatibility mode for 16-bit color)
-
-## Related
-
-- [TresCom Forum](https://www.trescomforum.org/) — active modding community
-- [OpenTrespasser](https://github.com/OpenTrespasser/JurassicParkTrespasser) — abandoned CMake modernization attempt
-- [Trespasser CE](https://www.trescomforum.org/viewforum.php?f=6) — closed-source DX9/OpenAL fork (author disappeared in 2014)
-
-## License
-
-The source code was shared unofficially by DreamWorks Interactive developers. No official license exists. This repository is for preservation and research.
 
 ## Solution Structure
 
-> Source: Fabien Sanglard, [*Jurassic Park: Trespasser Source Code Review*](http://fabiensanglard.net/trespasser) (2014).
+The workspace contains 23 sub-projects (~300K lines of C++ across 1241 files).
 
-The workspace contains 23 sub-projects (~300K lines of C++ across 1241 files):
+> Source: Fabien Sanglard, [Trespasser Source Code Review](http://fabiensanglard.net/trespasser) (2014).
 
 | Project | Generates | Description |
 |---|---|---|
@@ -86,3 +72,13 @@ The workspace contains 23 sub-projects (~300K lines of C++ across 1241 files):
 | View | View.lib | Raster-to-window: blitter, DirectDraw, D3D, palette viewers |
 | WaveTest | WaveTest.exe | Wave modeling test shell |
 | WinShell | WinShell.lib | Win32 window creation and management |
+
+## Related
+
+- [TresCom Forum](https://www.trescomforum.org/) — active modding community
+- [OpenTrespasser](https://github.com/OpenTrespasser/JurassicParkTrespasser) — CMake modernization attempt (abandoned)
+- [Trespasser CE](https://www.trescomforum.org/viewforum.php?f=6) — closed-source DX9/OpenAL fork (2014)
+
+## Disclaimer
+
+This source code was originally shared by the development team for community preservation. It is provided for **educational and preservation purposes only**. No game assets, copyrighted materials, or proprietary data are included. This is not a commercial project. Use at your own risk.
