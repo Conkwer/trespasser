@@ -73,19 +73,16 @@ void FindRunningApp(LPARAM lMsgName)
 
 BOOL VerifyProcessor()
 {
+#if TARGET_PROCESSOR == PROCESSOR_PENTIUM || TARGET_PROCESSOR == PROCESSOR_PENTIUMPRO
+	// Pentium and P6 builds work on any modern machine — skip detection
+	return true;
+#endif
+
 	CCPUDetect		detProcessor;
 	// have we managed to detect the type of the local processor??
 	if ( detProcessor.bProcessorDetected() )
 	{
-#if TARGET_PROCESSOR == PROCESSOR_PENTIUM
-		//
-		// The pentium build works on any machine
-		//
-		OutputDebugString("Target build Processor: Intel Pentium\n");
-		OutputDebugString(detProcessor.strLocalProcessorName());
-		return true;
-
-#elif TARGET_PROCESSOR == PROCESSOR_PENTIUMPRO
+#if TARGET_PROCESSOR == PROCESSOR_PENTIUMPRO
 		//
 		// The PentiumPro build only works on an Intel PentiumPro/Pentium II
 		//
