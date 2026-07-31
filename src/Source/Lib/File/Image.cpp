@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Todo:
  *
@@ -244,7 +244,7 @@ TSymbol* CSymbolTable::create_symbol(const char* name)
 
 TSymbol* CSymbolTable::get_symbol(const TSymbolHandle symbol_handle)
 {
-	vector<SSymbol*, allocator<SSymbol*> >::iterator i;
+	table_container_t::iterator i;
 	for (i = table.begin(); i != table.end(); ++i)
 		if ((*i)->handle == symbol_handle)
 			break;
@@ -257,7 +257,7 @@ TSymbol* CSymbolTable::get_symbol(const TSymbolHandle symbol_handle)
 
 TSymbol* CSymbolTable::get_symbol(const char* symbol_name)
 {
-	vector<SSymbol*, allocator<SSymbol*> >::iterator i;
+	table_container_t::iterator i;
 	for (i = table.begin(); i != table.end(); ++i)
 		if (!strcmp((*i)->name, symbol_name))
 			break;
@@ -274,7 +274,7 @@ unsigned int CSymbolTable::write_out(HANDLE hfile)
 	unsigned int size = 0;
 	SSymbolEntry entry;
 
-	vector<SSymbol*, allocator<SSymbol*> >::iterator i;
+	table_container_t::iterator i;
 
 	for (i = table.begin(); i != table.end(); ++i)
 	{
@@ -301,7 +301,7 @@ void CSymbolTable::dump()
 {
 	cout << "Symbol Table:\n";
 
-	vector<SSymbol*, allocator<SSymbol*> >::iterator i;
+	table_container_t::iterator i;
 	for (i = table.begin(); i != table.end(); ++i)
 	{
 		(*i)->dump();

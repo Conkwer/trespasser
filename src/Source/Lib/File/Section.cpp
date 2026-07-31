@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Todo:
  *
@@ -30,7 +30,7 @@
 
 CSectionDB::~CSectionDB()
 {
-	vector<CSection*, allocator<CSection*> >::iterator i;
+	section_ptr_vec_t::iterator i;
 
 	for (i = db.begin(); i != db.end(); ++i)
 	{
@@ -54,7 +54,7 @@ void* CSectionDB::get_data(CFileImage* file_image, const SMemRef& memref, bool r
 		return 0;
 	
 	// Get section that memref refers to.
-	vector<CSection*, allocator<CSection*> >::iterator i;
+	section_ptr_vec_t::iterator i;
 	for (i = db.begin(); i != db.end(); ++i)
 		if (**i == memref)
 			break;
@@ -82,7 +82,7 @@ unsigned int CSectionDB::write_out(HANDLE hfile)
 
 	TRelAddr FR_start = SetFilePointer(hfile, 0, NULL, FILE_CURRENT);
 	
-	vector<CSection*, allocator<CSection*> >::iterator i;
+	section_ptr_vec_t::iterator i;
 	
 	// Write out sections first, since the sections fill in (partly) their own headers.
 	// Seek to raw section start.
@@ -125,7 +125,7 @@ void CSectionDB::dump()
 {
 	cout << "Section Database:\n";
 	cout << "<Sections>(list):\n";
-	vector<CSection*, allocator<CSection*> >::iterator i;
+	section_ptr_vec_t::iterator i;
 	for (i = db.begin(); i != db.end(); ++i)
 	{
 		(*i)->dump();
@@ -141,7 +141,7 @@ void CSectionDB::dump()
 CSection::~CSection()
 {
 	// Delete section areas.
-	vector<CArea*, allocator<CArea*> >::iterator i;
+	area_ptr_vec_t::iterator i;
 	for (i = areas.begin(); i != areas.end(); ++i)
 	{
 		delete (*i);
@@ -244,9 +244,9 @@ unsigned int CSection::write_out(HANDLE hfile, TSectionHandle handle)
 	section_info.header.RelocationCount = 0;
 	
 	// Relocation list.
-	vector<SRelocationEntry, allocator<SRelocationEntry> > relos;
+	std::vector<SRelocationEntry, std::allocator<SRelocationEntry> > relos;
 
-	vector<CArea*, allocator<CArea*> >::iterator i;
+	area_ptr_vec_t::iterator i;
 
 	// First we fill in offset in section where areas will begin and
 	//  we fix up symbol since we now know the memref.
@@ -276,7 +276,7 @@ unsigned int CSection::write_out(HANDLE hfile, TSectionHandle handle)
 		section_info.header.SectionSize += bytes+align;
 		
 		// Build section area relocations list.
-		vector<CArea::SAreaRelocation, allocator<CArea::SAreaRelocation> >::iterator j;
+	CArea::SAreaRelocation* j;
 		for (j = (*i)->AB_relocations.begin(); j != (*i)->AB_relocations.end(); ++j)
 		{
 			SRelocationEntry relo_entry;
@@ -328,7 +328,7 @@ unsigned int CSection::write_out(HANDLE hfile, TSectionHandle handle)
 	section_info.header.RelocationOffset = section_info.header.SectionSize;
 
 	// Write out relocations.
-	vector<SRelocationEntry, allocator<SRelocationEntry> >::iterator j;
+SRelocationEntry* j;
 	for (j = relos.begin(); j != relos.end(); ++j)
 	{
 		WriteFile(hfile, &(*j), sizeof(SRelocationEntry), &lbytes, NULL);
@@ -348,7 +348,7 @@ void CSection::dump()
 	cout << "Section @" << (void*)this << ":\n";
 	section_info.dump();
 	cout << "<Areas>(list):\n";
-	vector<CArea*, allocator<CArea*> >::iterator i;
+	area_ptr_vec_t::iterator i;
 	for (i = areas.begin(); i != areas.end(); ++i)
 		(*i)->dump();
 }

@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Contents:
  *
@@ -22,6 +22,7 @@
 // Opaque types from Windows.
 typedef void* HANDLE;
 
+#include <vector>
 #include "Spec.hpp"
 
 #include <string>
@@ -88,7 +89,8 @@ private:
 
 	unsigned int write_out(HANDLE hfile);					// Write out symbol table to file.
 
-	vector<SSymbol*, allocator<SSymbol*> > table;			// The table itself is just a list of SSymbols.
+	typedef std::vector<SSymbol*, std::allocator<SSymbol*> > table_container_t;
+		table_container_t table;			// The table itself is just a list of SSymbols.
 #ifdef _DEBUG
 	void dump();
 #endif

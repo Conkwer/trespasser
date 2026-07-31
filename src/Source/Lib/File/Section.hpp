@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Contents:
  *	A section is a logical structure that holds related data.  Areas within sections are
@@ -68,7 +68,8 @@ class CSectionDB
 	unsigned int number_of_sections();
 
 	// The database consists of section info structures.
-	vector<CSection*, allocator<CSection*> > db;
+	typedef std::vector<CSection*, std::allocator<CSection*> > section_ptr_vec_t;
+	section_ptr_vec_t db;
 
 #ifdef _DEBUG
 	void dump();
@@ -117,7 +118,8 @@ private:
 	bool operator==(const SMemRef& memref);
 
 	SSectionInfo section_info;					// Data in memory.
-	vector<CArea*, allocator<CArea*> > areas;	// All areas in this section.
+	typedef std::vector<CArea*, std::allocator<CArea*> > area_ptr_vec_t;
+	area_ptr_vec_t areas;	// All areas in this section.
 
 	// Write out section data.
 	unsigned int write_out(HANDLE hfile, TSectionHandle handle);
@@ -201,7 +203,8 @@ private:
 	TSymbol* symbol;		// Symbol name for this area, this is optional since all areas aren't named.
 
 	// List of all the relocations for this area.
-	vector<SAreaRelocation, allocator<SAreaRelocation> > AB_relocations;
+	typedef std::vector<SAreaRelocation, std::allocator<SAreaRelocation> > relocation_vec_t;
+	relocation_vec_t AB_relocations;
 #ifdef _DEBUG
 	void dump();
 #endif
