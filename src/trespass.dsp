@@ -45,7 +45,7 @@ RSC=rc.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ".\trespass"
 # ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
-# ADD CPP /nologo /G5 /MD /W3 /GR /Zi /O2 /I "\jp2_pc\source\gblinc" /I "\jp2_pc\inc" /I "\jp2_pc\source" /I "\jp2_pc\inc\smacker" /I "\jp2_pc\inc\stl" /I "\jp2_pc\inc\directx" /D "NDEBUG" /D BUILDVER_MODE=MODE_RELEASE /D "WIN32" /D "_WINDOWS" /D "TRESPASS" /FD /c
+# ADD CPP /nologo /G5 /MD /W3 /GR /O1 /I "\jp2_pc\source\gblinc" /I "\jp2_pc\inc" /I "\jp2_pc\source" /I "\jp2_pc\inc\smacker" /I "\jp2_pc\inc\stl" /I "\jp2_pc\inc\directx" /D "NDEBUG" /D BUILDVER_MODE=MODE_RELEASE /D "WIN32" /D "_WINDOWS" /D "TRESPASS" /FD /c
 # SUBTRACT CPP /Fr /YX
 # ADD BASE MTL /nologo /D "NDEBUG" /win32
 # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
@@ -56,7 +56,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib /nologo /subsystem:windows /machine:I386
-# ADD LINK32 lib\smacker\smackw32.lib comctl32.lib winmm.lib kernel32.lib user32.lib gdi32.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib lz32.lib version.lib /nologo /stack:0x100000 /subsystem:windows /incremental:yes /debug /debugtype:both /machine:I386 /nodefaultlib:"libc" /nodefaultlib:"libci" /SECTION:SelfMod,ERW
+# ADD LINK32 lib\smacker\smackw32.lib comctl32.lib winmm.lib kernel32.lib user32.lib gdi32.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib lz32.lib version.lib /nologo /stack:0x100000 /subsystem:windows /incremental:no /machine:I386 /nodefaultlib:"libc" /nodefaultlib:"libci" /SECTION:SelfMod,ERW
 # SUBTRACT LINK32 /pdb:none
 
 !ELSEIF  "$(CFG)" == "trespass - Win32 Debug"
