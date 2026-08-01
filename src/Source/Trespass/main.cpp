@@ -598,7 +598,7 @@ DoRestartWithRenderDlg:
     // Check for Video Driver Certification
     //
     if (!g_initDD.IsCertified() && 
-        !GetRegValue(REG_KEY_DDRAW_CERT_IGNORE, FALSE))
+        !GetRegValue(REG_KEY_DDRAW_CERT_IGNORE, TRUE))
     {
         CErrorDlg   cdlg(ERRORDLG_DDRAW_CERTIFIED);
 

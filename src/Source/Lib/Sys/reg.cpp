@@ -32,40 +32,49 @@ void DisableSafemode()
 //
 static void WriteDefaults()
 {
+	SetRegString(REG_KEY_DATA_DRIVE,        ".\\");
+	SetRegString(REG_KEY_INSTALLED_DIR,     ".\\");
+
 	SetRegValue(REG_KEY_INSTALLED,            1);
 	SetRegValue(REG_KEY_SAFEMODE,             0);
-	SetRegValue(strAUTOSETTINGS,               TRUE);
-	SetRegValue(REG_KEY_NOVIDEO,              DEFAULT_REG_NOVIDEO);
-	SetRegValue(strSIZE_WIDTH,                DEFAULT_SIZE_WIDTH);
-	SetRegValue(strSIZE_HEIGHT,               DEFAULT_SIZE_HEIGHT);
-	SetRegValue(strFLAG_FULLSCREEN,           DEFAULT_FULLSCREEN);
-	SetRegValue(strFLAG_D3D,                  DEFAULT_D3D);
-	SetRegValue(strFLAG_SYSTEMMEM,            DEFAULT_SYSTEMMEM);
-	SetRegValue(REG_KEY_AUDIO_EFFECT,         DEFAULT_AUDIO_EFFECT);
-	SetRegValue(REG_KEY_AUDIO_AMBIENT,        DEFAULT_AUDIO_AMBIENT);
-	SetRegValue(REG_KEY_AUDIO_VOICEOVER,      DEFAULT_AUDIO_VOICEOVER);
-	SetRegValue(REG_KEY_AUDIO_MUSIC,          DEFAULT_AUDIO_MUSIC);
-	SetRegValue(REG_KEY_AUDIO_SUBTITLES,      DEFAULT_AUDIO_SUBTITLES);
-	SetRegValue(REG_KEY_AUDIO_ENABLE3D,       DEFAULT_AUDIO_ENABLE3D);
-	SetRegValue(REG_KEY_RENDERING_QUALITY,    DEFAULT_RENDERING_QUALITY);
-	SetRegValue(REG_KEY_GAMMA,                DEFAULT_GAMMA);
-	SetRegValue(REG_KEY_GORE,                 DEFAULT_GORE);
-	SetRegValue(REG_KEY_INVERTMOUSE,          DEFAULT_INVERTMOUSE);
-	SetRegValue(REG_KEY_VIEWPORT_X,           DEFAULT_VIEWPORT_X);
-	SetRegValue(REG_KEY_VIEWPORT_Y,           DEFAULT_VIEWPORT_Y);
-	SetRegValue(REG_KEY_AUTOLOAD,             FALSE);
-	SetRegValue(REG_KEY_AUTOSAVE,             FALSE);
+	SetRegValue(strAUTOSETTINGS,              1);
 	SetRegValue(strFLAG_REGINIT,              1);
+
+	// Display defaults: 640x480 software
+	SetRegValue(strFLAG_FULLSCREEN,           1);
+	SetRegValue(strFLAG_D3D,                  0);
+	SetRegValue(strFLAG_SYSTEMMEM,            0);
+	SetRegValue(strSIZE_WIDTH,                640);
+	SetRegValue(strSIZE_HEIGHT,               480);
 	SetRegValue(strD3D_DITHER,                1);
 	SetRegValue(strTRIPLEBUFFER,              0);
 	SetRegValue(strPAGEMANAGED,               1);
 	SetRegValue(strHARDWARE_WATER,            0);
-	SetRegValue(strZBUFFER_BITDEPTH,          16);
+	SetRegValue(strZBUFFER_BITDEPTH,          37);
 	SetRegValue(strRECOMMENDEDTEXMAX,         256);
 	SetRegValue(strD3D_FILTERCACHES,          0);
+	SetRegValue(REG_KEY_NOVIDEO,              0);
+	SetRegValue(REG_KEY_RENDERING_QUALITY,    2);
+	SetRegValue(REG_KEY_GAMMA,                3);
 
-	SetRegString(REG_KEY_DATA_DRIVE,        ".\\");
-	SetRegString(REG_KEY_INSTALLED_DIR,     ".\\");
+	// Audio: all on by default
+	SetRegValue(REG_KEY_AUDIO_EFFECT,         -1);
+	SetRegValue(REG_KEY_AUDIO_AMBIENT,        -1);
+	SetRegValue(REG_KEY_AUDIO_VOICEOVER,      -1);
+	SetRegValue(REG_KEY_AUDIO_MUSIC,          -1);
+	SetRegValue(REG_KEY_AUDIO_SUBTITLES,      0);
+	SetRegValue(REG_KEY_AUDIO_ENABLE3D,       -1);
+
+	// Gameplay
+	SetRegValue(REG_KEY_GORE,                 3);
+	SetRegValue(REG_KEY_INVERTMOUSE,          0);
+	SetRegValue(REG_KEY_VIEWPORT_X,           0);
+	SetRegValue(REG_KEY_VIEWPORT_Y,           0);
+
+	// Misc
+	SetRegValue(REG_KEY_AUTOLOAD,             0);
+	SetRegValue(REG_KEY_AUTOSAVE,             0);
+	SetRegValue(REG_KEY_DDRAW_CERT_IGNORE,    1);
 }
 
 void OpenKey()
