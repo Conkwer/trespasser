@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Implementation of Control.hpp.
  *
@@ -230,7 +230,7 @@ SKeyMapping km_DefaultKeyMapping[KEYMAP_COUNT] =
 	{DIK_W,			uBITKEY_RUN},
 	{DIK_S,			uBITKEY_WALK},
 	{DIK_X,			uBITKEY_BACKUP},
-	{DIK_A			uBITKEY_LEFT},
+	{DIK_A,			uBITKEY_LEFT},
 	{DIK_D,			uBITKEY_RIGHT},
 };
 
