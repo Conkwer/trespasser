@@ -227,8 +227,9 @@ SKeyMapping km_DefaultKeyMapping[KEYMAP_COUNT] =
 
 	// these are not actual actions, they get converted into floating point values before CInput
 	// returns the values. They are simply in this table for efficiency reasons.
-	{DIK_X,			uBITKEY_RUN},
-	{DIK_S,			uBITKEY_BACKUP},
+	{DIK_W,			uBITKEY_RUN},
+	{DIK_S,			uBITKEY_WALK},
+	{DIK_X,			uBITKEY_BACKUP},
 	{DIK_A,			uBITKEY_LEFT},
 	{DIK_D,			uBITKEY_RIGHT},
 };
@@ -256,8 +257,9 @@ SKeyMapping km_DefaultKeyMapping[KEYMAP_COUNT] =
     {'R',           uCMD_REPLAYVO},     // Replays the last Voice Over
 
 	// see above DIK codes
-	{'X',			uBITKEY_RUN},
-	{'S',			uBITKEY_BACKUP},
+	{'W',			uBITKEY_RUN},
+	{'S',			uBITKEY_WALK},
+	{'X',			uBITKEY_BACKUP},
 	{'A',			uBITKEY_LEFT},
 	{'D',			uBITKEY_RIGHT},
 };
