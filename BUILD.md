@@ -1,5 +1,26 @@
 # Trespasser Build Guide
 
+## Restoring the Toolchain
+
+The toolchain is manual but reproducible:
+1. Install **Windows XP SP3 (32-bit)** VM
+2. Install **Visual Studio 6.0** + **SP6**
+3. Install **FreeSSHd** for remote access
+4. Configure host-only network: `192.168.56.101`
+5. Map shared folder to `Z:\` — copy source to `C:\jp2_pc`
+
+Build scripts in `scripts/` automate the rest. SSH config on the Linux side:
+```
+Host winxp
+  HostName 192.168.56.101
+  User root
+  HostKeyAlgorithms +ssh-rsa
+  KexAlgorithms +diffie-hellman-group1-sha1
+  MACs +hmac-sha1
+  Ciphers aes128-cbc
+  StrictHostKeyChecking no
+```
+
 ## Environment
 
 - **Windows XP SP3** (32-bit) VM with Visual Studio 6.0 + SP6
@@ -83,5 +104,10 @@ The bundled HP/SGI STL in `Inc/STL/` uses single-template-argument `vector<T>` i
 
 - **v1.0 source only** — matches v1.0 retail data, not v1.1 patched data
 - **DirectX 6 renderer** — software/painter's algorithm + D3D6 hardware path. No DX9/OpenAL
-- **Registry-based config** — writes to `HKLM\Software\DreamWorks Interactive\Trespasser`. INI replacement pending
+- **Registry-free config** — `trespass.ini` replaced Windows registry via `GetPrivateProfileString`. GUIApp still uses some registry functions
 - **16-bit color mode required** — GUIApp needs 16-bit display. Win11: Compatibility → Reduced color mode
+
+### INI config instead of registry (1 file)
+`src/Source/Lib/Sys/reg.cpp`
+
+Replaced all Windows registry calls with `GetPrivateProfileString`/`WritePrivateProfileString` targeting `.\trespass.ini` in a flat `[Settings]` section. On first run, the game creates the INI with defaults from `RegInit.hpp`. Binary data (KeyMap, GUIDs) is stored as hex strings.
