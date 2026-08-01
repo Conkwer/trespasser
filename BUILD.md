@@ -103,8 +103,10 @@ The bundled HP/SGI STL in `Inc/STL/` uses single-template-argument `vector<T>` i
 ## Known Limitations
 
 - **v1.0 source only** — matches v1.0 retail data, not v1.1 patched data
-- **DirectX 6 renderer** — software/painter's algorithm + D3D6 hardware path. No DX9/OpenAL
-- **Registry-free config** — `trespass.ini` replaced Windows registry via `GetPrivateProfileString`. GUIApp still uses some registry functions
+- **DirectX 6 renderer** — use [dgVoodoo2](https://dege.freeweb.hu/dgVoodoo2/dgVoodoo2/) to wrap DX6→DX12 with resolution scaling. DX9 migration not planned (dgVoodoo2 handles this)
+- **Audio** — DirectSound3D via [DSOAL](https://www.nexusmods.com/oblivion/mods/48872) wrapper (DS→OpenAL). Native OpenAL support planned
+- **Input** — Win32 keyboard + DirectInput. XInput controller support possible via DirectX SDK without renderer changes
+- **Registry-free config** — `trespass.ini` replaced Windows registry
 - **16-bit color mode required** — GUIApp needs 16-bit display. Win11: Compatibility → Reduced color mode
 
 ### INI config instead of registry (1 file)
