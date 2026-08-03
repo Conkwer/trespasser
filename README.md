@@ -1,8 +1,6 @@
 # 🦖 Trespasser-Plus
 
-Preservation and enhancement of the Trespasser engine source code, compiled and maintained with fixes for modern systems.
-
-Project is not related to OpenTrespasser and follows the original Trespasser's pipeline.
+Preservation and enhancement of the Trespasser engine source code. Project is not related to OpenTrespasser and follows the original Trespasser's pipeline.
 
 **WARNING: You need vintage software and hardware to compile this.**
 
