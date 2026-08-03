@@ -1,6 +1,6 @@
 // Simple looping background music player.
-// Decodes OGG via stb_vorbis, wraps in a WAV header in memory,
-// plays via PlaySound (winmm).  No DirectSound dependency.
+// WAV: plays directly via PlaySound from file.
+// OGG: decodes via stb_vorbis to a temp WAV, plays from file.
 //
 // Does NOT interact with the game's AudioDaemon / TPA system.
 
@@ -18,24 +18,23 @@
 #pragma pack(push, 1)
 struct WavHeader
 {
-	char    riff[4];        // "RIFF"
-	DWORD   fileSize;       // 36 + dataSize
-	char    wave[4];        // "WAVE"
-	char    fmt[4];         // "fmt "
-	DWORD   fmtSize;        // 16 for PCM
-	WORD    formatTag;      // 1 = PCM
+	char    riff[4];
+	DWORD   fileSize;
+	char    wave[4];
+	char    fmt[4];
+	DWORD   fmtSize;
+	WORD    formatTag;
 	WORD    channels;
 	DWORD   sampleRate;
 	DWORD   bytesPerSec;
 	WORD    blockAlign;
 	WORD    bitsPerSample;
-	char    data[4];        // "data"
+	char    data[4];
 	DWORD   dataSize;
 };
 #pragma pack(pop)
 
-static BYTE*  g_pWavMem  = NULL;  // WAV header + PCM, for PlaySound
-static bool   g_bActive  = false;
+static char g_szTempWav[MAX_PATH] = "";
 
 //-----------------------------------------------------------------------------
 CBackgroundMusic::CBackgroundMusic()
@@ -53,7 +52,6 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 {
 	Stop();
 
-	// Check extension
 	const char* pszExt = strrchr(pszFilename, '.');
 	if (!pszExt || (lstrcmpi(pszExt, ".ogg") != 0 && lstrcmpi(pszExt, ".wav") != 0))
 		return false;
@@ -61,80 +59,82 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 	if (GetFileAttributes(pszFilename) == 0xFFFFFFFF)
 		return false;
 
+	// WAV: play directly from file
 	if (lstrcmpi(pszExt, ".wav") == 0)
 	{
-		// Play WAV directly via PlaySound from file
 		if (!PlaySound(pszFilename, NULL, SND_FILENAME | SND_LOOP | SND_ASYNC))
 			return false;
 		m_bPlaying = true;
-		g_bActive = true;
 		return true;
 	}
 
-	// --- OGG: decode to PCM ---
+	// OGG: decode to PCM, write temp WAV, play from file
 	int channels, sample_rate;
 	short* pcm;
 	int nSamples = stb_vorbis_decode_filename(pszFilename, &channels, &sample_rate, &pcm);
 	if (nSamples <= 0)
 		return false;
 
-	// --- build WAV header in memory ---
+	// Build temp WAV path in the game directory
+	GetTempPath(MAX_PATH, g_szTempWav);
+	lstrcat(g_szTempWav, "tp_bgm.wav");
+
 	DWORD dataSize = nSamples * sizeof(short);
 	DWORD totalSize = sizeof(WavHeader) + dataSize;
 
-	g_pWavMem = (BYTE*)malloc(totalSize);
-	if (!g_pWavMem)
+	HANDLE hFile = CreateFile(g_szTempWav, GENERIC_WRITE, 0, NULL,
+	                          CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
+	if (hFile == INVALID_HANDLE_VALUE)
 	{
 		free(pcm);
 		return false;
 	}
 
-	WavHeader* pHdr = (WavHeader*)g_pWavMem;
-	ZeroMemory(pHdr, sizeof(WavHeader));
-	memcpy(pHdr->riff,  "RIFF", 4);
-	pHdr->fileSize     = totalSize - 8;
-	memcpy(pHdr->wave,  "WAVE", 4);
-	memcpy(pHdr->fmt,   "fmt ", 4);
-	pHdr->fmtSize      = 16;
-	pHdr->formatTag    = 1;  // PCM
-	pHdr->channels     = (WORD)channels;
-	pHdr->sampleRate   = sample_rate;
-	pHdr->bitsPerSample = 16;
-	pHdr->blockAlign   = (WORD)(channels * 2);
-	pHdr->bytesPerSec  = sample_rate * channels * 2;
-	memcpy(pHdr->data,  "data", 4);
-	pHdr->dataSize     = dataSize;
+	WavHeader hdr;
+	ZeroMemory(&hdr, sizeof(hdr));
+	memcpy(hdr.riff,  "RIFF", 4);
+	hdr.fileSize     = totalSize - 8;
+	memcpy(hdr.wave,  "WAVE", 4);
+	memcpy(hdr.fmt,   "fmt ", 4);
+	hdr.fmtSize      = 16;
+	hdr.formatTag    = 1;
+	hdr.channels     = (WORD)channels;
+	hdr.sampleRate   = sample_rate;
+	hdr.bitsPerSample = 16;
+	hdr.blockAlign   = (WORD)(channels * 2);
+	hdr.bytesPerSec  = sample_rate * channels * 2;
+	memcpy(hdr.data,  "data", 4);
+	hdr.dataSize     = dataSize;
 
-	// Copy PCM after header
-	memcpy(g_pWavMem + sizeof(WavHeader), pcm, dataSize);
+	DWORD dwWritten;
+	WriteFile(hFile, &hdr, sizeof(hdr), &dwWritten, NULL);
+	WriteFile(hFile, pcm, dataSize, &dwWritten, NULL);
+	CloseHandle(hFile);
 	free(pcm);
 
-	// Play from memory, looping, async
-	if (!PlaySound((LPCSTR)g_pWavMem, NULL, SND_MEMORY | SND_LOOP | SND_ASYNC))
+	if (!PlaySound(g_szTempWav, NULL, SND_FILENAME | SND_LOOP | SND_ASYNC))
 	{
-		free(g_pWavMem);
-		g_pWavMem = NULL;
+		DeleteFile(g_szTempWav);
+		g_szTempWav[0] = '\0';
 		return false;
 	}
 
 	m_bPlaying = true;
-	g_bActive = true;
 	return true;
 }
 
 //-----------------------------------------------------------------------------
 void CBackgroundMusic::Stop()
 {
-	PlaySound(NULL, NULL, 0);  // Stop any playing sound
+	PlaySound(NULL, NULL, 0);
 
-	if (g_pWavMem)
+	if (g_szTempWav[0])
 	{
-		free(g_pWavMem);
-		g_pWavMem = NULL;
+		DeleteFile(g_szTempWav);
+		g_szTempWav[0] = '\0';
 	}
 
 	m_bPlaying = false;
-	g_bActive = false;
 }
 
 //-----------------------------------------------------------------------------
