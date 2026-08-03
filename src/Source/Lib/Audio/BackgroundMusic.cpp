@@ -85,26 +85,27 @@ static int DecodeNibble(int nib, int* pPred, int* pIdx)
 	return samp;
 }
 
-// Decode ADX frame (mono channel, 18 bytes → 32 samples)
-static void DecodeADXFrame(short* dst, const BYTE* src, int* pS1, int* pS2)
+// Decode ADX frame (18 bytes → 32 samples per channel)
+// coeff[2] = {c1*2^14, c2*2^14} pre-scaled from standard formula
+static void DecodeADXFrame(short* dst, const BYTE* src, int* pS1, int* pS2,
+                           int c1, int c2)
 {
-	int scale = (src[0] << 8) | src[1];
+	int scale = ((src[0] << 8) | src[1]) & 0x1FFF;
 	int s1 = *pS1, s2 = *pS2;
-	src += 2;
-	for (int i = 0; i < 16; i++)
+	for (int i = 2; i < 18; i++)
 	{
-		// Low nibble
-		int d = src[i] >> 4;
+		int b = src[i];
+		// High nibble first
+		int d = b >> 4;
 		if (d & 8) d -= 16;
-		int s0 = (0x4000 * d * scale + 0x7298 * s1 - 0x3350 * s2) >> 14;
+		int s0 = d * scale + ((c1 * s1 + c2 * s2) >> 14);
 		if (s0 > 32767) s0 = 32767; else if (s0 < -32768) s0 = -32768;
 		*dst++ = (short)s0;
 		s2 = s1; s1 = s0;
-
-		// High nibble
-		d = src[i] & 15;
+		// Low nibble
+		d = b & 15;
 		if (d & 8) d -= 16;
-		s0 = (0x4000 * d * scale + 0x7298 * s1 - 0x3350 * s2) >> 14;
+		s0 = d * scale + ((c1 * s1 + c2 * s2) >> 14);
 		if (s0 > 32767) s0 = 32767; else if (s0 < -32768) s0 = -32768;
 		*dst++ = (short)s0;
 		s2 = s1; s1 = s0;
@@ -112,41 +113,57 @@ static void DecodeADXFrame(short* dst, const BYTE* src, int* pS1, int* pS2)
 	*pS1 = s1; *pS2 = s2;
 }
 
-// Decode ADX file to stereo PCM
+// Decode ADX file to PCM
 static DWORD DecodeADX(BYTE* pSrc, DWORD srcSize, int channels,
                         BYTE* pDst, DWORD dstMax)
 {
-	BYTE* pDstStart = pDst;
-	// Read header to find start of audio data
-	if (srcSize < 4 || pSrc[0] != 0x80) return 0;
-	WORD offset = (pSrc[2] << 8) | pSrc[3]; // big-endian
-	if (offset < 6 || (DWORD)offset + 6 > srcSize) return 0;
-	// Verify copyright
-	if (memcmp(pSrc + offset, "(c)CRI", 6) != 0) return 0;
-	DWORD pos = offset + 6;
+	if (srcSize < 24 || pSrc[0] != 0x80) return 0;
 
+	WORD copyOff   = (pSrc[2] << 8) | pSrc[3];   // BE
+	BYTE encType   = pSrc[4];
+	BYTE blockSize = pSrc[5];  // usually 18
+	BYTE bitDepth  = pSrc[6];  // usually 4
+	// channel count at [7], sample rate at [8-11] BE, total samples [12-15] BE
+	int highpass   = (pSrc[0x10] << 8) | pSrc[0x11];  // BE
+
+	if ((DWORD)copyOff + 6 > srcSize) return 0;
+	if (memcmp(pSrc + copyOff - 2, "(c)CRI", 6) != 0) return 0;
+	DWORD pos = copyOff + 4;  // audio data starts here
+
+	// Compute prediction coefficients
+	int c1, c2;
+	if (encType == 3) // standard ADX: compute from highpass
+	{
+		double a = 1.41421356237 - cos(6.28318530718 * (double)highpass / 44100.0);
+		double b = 0.41421356237;
+		double cc = (a - sqrt((a + b) * (a - b))) / b;
+		c1 = (int)(cc * 2.0 * 16384.0);
+		c2 = (int)(-(cc * cc) * 16384.0);
+	}
+	else // type 2: fixed coefficients (use set 0 = all zero → no prediction)
+	{
+		c1 = 0; c2 = 0;
+	}
+
+	BYTE* pDstStart = pDst;
 	int s1[2] = {0, 0}, s2[2] = {0, 0};
 
-	while (pos + (DWORD)(channels * 18) <= srcSize)
+	while (pos + (DWORD)(channels * blockSize) <= srcSize)
 	{
-		short* dst = (short*)(pDst);
-		// Check remaining space
-		if ((DWORD)((BYTE*)dst - pDstStart) + channels * 32 * 2 > dstMax)
+		short* dst = (short*)pDst;
+		if ((DWORD)((BYTE*)dst - pDstStart) + channels * 32 * 4 > dstMax)
 			break;
 
 		for (int ch = 0; ch < channels; ch++)
 		{
-			if (pos + 18 > srcSize) goto done;
 			short tmp[32];
-			DecodeADXFrame(tmp, pSrc + pos, &s1[ch], &s2[ch]);
-			pos += 18;
-			// Interleave into stereo output
+			DecodeADXFrame(tmp, pSrc + pos, &s1[ch], &s2[ch], c1, c2);
+			pos += blockSize;
 			for (int i = 0; i < 32; i++)
 				dst[i * channels + ch] = tmp[i];
 		}
 		pDst += channels * 32 * 2;
 	}
-done:
 	return (DWORD)(pDst - pDstStart);
 }
 
@@ -223,13 +240,12 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 		BYTE* pd = (BYTE*)malloc(fs);
 		if (!pd) { CloseHandle(hf); return false; }
 		ReadFile(hf, pd, fs, &fs, NULL); CloseHandle(hf);
-		if (fs < 4 || pd[0] != 0x80) { BgmLog("  FAIL: not ADX"); free(pd); return false; }
-		WORD off = (pd[2] << 8) | pd[3];
-		if ((DWORD)off + 14 >= fs) { BgmLog("  FAIL: bad ADX header"); free(pd); return false; }
-		ch = pd[off + 6];
-		sr = (pd[off + 10] << 24) | (pd[off + 11] << 16) | (pd[off + 12] << 8) | pd[off + 13];
-		if (sr < 4000 || sr > 96000) sr = 44100;
-		BgmLog("  ADX: %dch %dHz", ch, sr);
+		if (fs < 24 || pd[0] != 0x80) { BgmLog("  FAIL: not ADX"); free(pd); return false; }
+			ch = pd[7];
+			sr = (pd[8] << 24) | (pd[9] << 16) | (pd[10] << 8) | pd[11];
+			if (ch < 1 || ch > 2) ch = 2;
+			if (sr < 4000 || sr > 96000) sr = 44100;
+			BgmLog("  ADX: %dch %dHz type=%d", ch, sr, pd[4]);
 		pPCM = (BYTE*)malloc(fs * 4 + 4096);
 		DWORD dwDec = DecodeADX(pd, fs, ch, pPCM, fs * 4);
 		if (dwDec == 0) { BgmLog("  FAIL: ADX decode"); free(pd); free(pPCM); return false; }
