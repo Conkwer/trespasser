@@ -1,7 +1,7 @@
 # 🦖 Trespasser-Plus
   
 Project is not related to [OpenTrespasser](https://github.com/OpenTrespasser/JurassicParkTrespasser) and follow the original Trespasser's pipeline.   
-Achtung: You need a vintage hardware and software to compile this.    
+Note: You need a vintage hardware and software to compile this.    
 
 **Game assets are not included.** You must own the original CD (v1.0 retail, 1998) and copy the data files to use the compiled binary.
 
