@@ -4,13 +4,7 @@
 
 void InitDefaultConfigPath()
 {
-	// Prefer .cfg, fall back to .ini for backward compat
-	if (GetFileAttributes(".\\trespass.cfg") != 0xFFFFFFFF)
-		lstrcpy(g_szConfigPath, ".\\trespass.cfg");
-	else if (GetFileAttributes(".\\trespass.ini") != 0xFFFFFFFF)
-		lstrcpy(g_szConfigPath, ".\\trespass.ini");
-	else
-		lstrcpy(g_szConfigPath, ".\\trespass.cfg");
+	lstrcpy(g_szConfigPath, ".\\trespass.cfg");
 }
 
 char g_szConfigPath[MAX_PATH] = "";

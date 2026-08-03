@@ -200,11 +200,50 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 		BYTE* pd = (BYTE*)malloc(fs);
 		if (!pd) { CloseHandle(hf); return false; }
 		ReadFile(hf, pd, fs, &fs, NULL); CloseHandle(hf);
-		if (memcmp(pd,"RIFF",4) || memcmp(pd+8,"WAVE",4) || *(WORD*)(pd+20)!=1)
-			{ BgmLog("  FAIL: not PCM WAV"); free(pd); return false; }
-		ch = *(WORD*)(pd+22); sr = *(DWORD*)(pd+24); sz = *(DWORD*)(pd+40);
-		pPCM = (BYTE*)malloc(sz);
-		if (pPCM) memcpy(pPCM, pd+44, sz);
+		if (memcmp(pd,"RIFF",4) || memcmp(pd+8,"WAVE",4))
+			{ BgmLog("  FAIL: not WAV"); free(pd); return false; }
+
+		WORD fmtTag = *(WORD*)(pd + 20);
+		ch  = *(WORD*)(pd + 22);
+		sr  = *(DWORD*)(pd + 24);
+		DWORD blockAlign = *(WORD*)(pd + 32);
+		// Find the 'data' chunk (skip fmt + optional fact chunks)
+		DWORD pos = 36; // after standard fmt header
+		// If PCM, pos is 36. If ADPCM, fmt chunk may be larger (extra bytes).
+		if (fmtTag == 0x11) // IMA ADPCM
+		{
+			WORD cbSize = *(WORD*)(pd + 34); // extra format bytes
+			pos = 36 + cbSize; // skip past fmt chunk
+		}
+		// Skip any intermediate chunks (fact, etc.) to find 'data'
+		while (pos < fs - 8 && memcmp(pd + pos, "data", 4) != 0)
+		{
+			DWORD chunkSize = *(DWORD*)(pd + pos + 4);
+			pos += 8 + chunkSize;
+		}
+		if (pos >= fs - 8 || memcmp(pd + pos, "data", 4) != 0)
+			{ BgmLog("  FAIL: no data chunk"); free(pd); return false; }
+		DWORD dataSize = *(DWORD*)(pd + pos + 4);
+		BYTE* pData = pd + pos + 8;
+
+		if (fmtTag == 1) // PCM
+		{
+			sz = dataSize;
+			pPCM = (BYTE*)malloc(sz);
+			if (pPCM) memcpy(pPCM, pData, sz);
+		}
+		else if (fmtTag == 0x11) // IMA ADPCM
+		{
+			BgmLog("  WAV ADPCM: align=%d data=%d", blockAlign, dataSize);
+			sz = 0; // will be set by decoder
+			pPCM = (BYTE*)malloc(dataSize * 4 + 4096); // worst case: 4x expansion
+			DWORD dwDec = DecodeADPCM(pData, dataSize, blockAlign, pPCM, dataSize * 4);
+			if (dwDec == 0)
+				{ BgmLog("  FAIL: ADPCM decode"); free(pd); free(pPCM); return false; }
+			sz = dwDec;
+			BgmLog("  ADPCM decoded: %d bytes PCM", sz);
+		}
+		else { BgmLog("  FAIL: unsupported WAV tag %d", fmtTag); free(pd); return false; }
 		free(pd);
 	}
 	else if (lstrcmpi(pszExt, ".ogg") == 0)
