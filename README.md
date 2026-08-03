@@ -7,7 +7,7 @@ Project is not related to [OpenTrespasser](https://github.com/OpenTrespasser/Jur
 
 ## Philosophy
 
-DirectX12 and graphic overhaul are not planned, we have dgVoodoo2 for that.
+DirectX12 and graphic overhaul are not planned.
 
 ## Quick Start
 
