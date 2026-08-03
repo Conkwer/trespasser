@@ -28,8 +28,8 @@ See [`BUILD.md`](BUILD.md) for the full toolchain setup, build commands, and det
 
 ## Philosophy
 
-DirectX12 and graphic overhauls are not planned.    
-On the modern systems dgVoodoo2 and dsoal is recommended for better compatibility.   
+DirectX 12 and graphics overhauls are not planned.    
+For modern systems, dgVoodoo2 + dsoal are recommended for compatibility.    
 
 ## Status
 
