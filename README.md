@@ -1,5 +1,6 @@
-# 🦖 Trespasser-Reloaded
+# 🦖 Trespasser-Plus
 
+Trespasser in all it C++98 glory. You should be insane to compile it.
 This is a preservation of the Trespasser engine source code, compiled and maintained with fixes for "modern" systems.
 
 **Game assets are not included.** You must own the original CD (v1.0 retail, 1998) and copy the data files to use the compiled binary.
