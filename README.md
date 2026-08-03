@@ -1,6 +1,10 @@
-# 🦖 Trespasser-Reloaded
+# 🦖 Trespasser-Plus
 
-This is a preservation of the Trespasser engine source code, compiled and maintained with fixes for modern systems.
+Preservation and enhancement of the Trespasser engine source code, compiled and maintained with fixes for modern systems.
+
+Project is not related to OpenTrespasser and follows the original Trespasser's pipeline.
+
+**WARNING: You need vintage software and hardware to compile this.**
 
 **Game assets are not included.** You must own the original CD (v1.0 retail, 1998) and copy the data files to use the compiled binary.
 
@@ -24,6 +28,11 @@ See [`BUILD.md`](BUILD.md) for the full toolchain setup, build commands, and det
 2. **Processor detection bypass** — modern CPUs are unrecognizable to 1998 CPUID
 3. **ESC menu instant-close** — dialog no longer closes on the same keypress that opened it
 4. **MFC paths** — resource compiler include/lib configuration
+
+## Philosophy
+
+DirectX 12 and graphics overhauls are not planned.
+For modern systems, dgVoodoo2 + dsoal are recommended for compatibility.
 
 ## Status
 
