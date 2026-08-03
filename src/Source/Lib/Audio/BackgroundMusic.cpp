@@ -99,7 +99,7 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 		free(pPCM); return false;
 	}
 	HWND hWnd = GetForegroundWindow();
-	if (FAILED(g_pDS->SetCooperativeLevel(hWnd, DSSCL_PRIORITY)))
+	if (FAILED(g_pDS->SetCooperativeLevel(hWnd, DSSCL_NORMAL)))
 	{
 		BgmLog("  FAIL: SetCooperativeLevel");
 		g_pDS->Release(); g_pDS = NULL;
