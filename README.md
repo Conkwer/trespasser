@@ -5,6 +5,10 @@ Project is not related to [OpenTrespasser](https://github.com/OpenTrespasser/Jur
 
 **Game assets are not included.** You must own the original CD (v1.0 retail, 1998) and copy the data files to use the compiled binary.
 
+## Philosophy
+
+DirectX12 and graphic overhaul are not planned, we have dgVoodoo2 for that.
+
 ## Quick Start
 
 Pre-compiled binaries are in [`dist/`](dist/):
