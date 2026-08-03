@@ -12,6 +12,7 @@
 
 #include "BackgroundMusic.hpp"
 
+extern HWND g_hwnd;  // game's main window (main.cpp)
 static LPDIRECTSOUND       g_pDS     = NULL;
 static LPDIRECTSOUNDBUFFER g_pDSBuf  = NULL;
 
@@ -98,8 +99,7 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 		BgmLog("  FAIL: DirectSoundCreate");
 		free(pPCM); return false;
 	}
-	HWND hWnd = GetForegroundWindow();
-	if (FAILED(g_pDS->SetCooperativeLevel(hWnd, DSSCL_NORMAL)))
+	if (FAILED(g_pDS->SetCooperativeLevel(g_hwnd, DSSCL_NORMAL)))
 	{
 		BgmLog("  FAIL: SetCooperativeLevel");
 		g_pDS->Release(); g_pDS = NULL;
@@ -119,7 +119,7 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 	DSBUFFERDESC dsbd;
 	ZeroMemory(&dsbd, sizeof(dsbd));
 	dsbd.dwSize         = sizeof(dsbd);
-	dsbd.dwFlags        = DSBCAPS_GLOBALFOCUS | DSBCAPS_CTRLVOLUME;
+	dsbd.dwFlags        = DSBCAPS_GLOBALFOCUS | DSBCAPS_CTRLVOLUME | DSBCAPS_LOCSOFTWARE;
 	dsbd.dwBufferBytes  = dwPCMSize;
 	dsbd.lpwfxFormat    = &wfx;
 
