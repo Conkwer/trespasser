@@ -22,6 +22,7 @@
 #include "main.h"
 #include "..\Lib\Sys\reg.h"
 #include "..\lib\sys\reginit.hpp"
+#include "..\Lib\Sys\IniFile.hpp"
 #include "supportfn.hpp"
 #include "tpassglobals.h"
 #include "gblinc/buildver.hpp"
@@ -429,6 +430,35 @@ int DoWinMain(HINSTANCE hInstance,
 
     g_hInst = hInstance;
     bUseGDIForMessages = false;
+
+	// Parse command line for -config/-cfg flag
+	{
+		char* pszCmd = lpCmdLine;
+		while (*pszCmd)
+		{
+			// Skip whitespace
+			while (*pszCmd == ' ' || *pszCmd == '\t') pszCmd++;
+			if (!*pszCmd) break;
+
+			// Check for -config or -cfg
+			if ((pszCmd[0] == '-' || pszCmd[0] == '/') &&
+			    (lstrcmpi(pszCmd+1, "config") == 0 || lstrcmpi(pszCmd+1, "cfg") == 0))
+			{
+				pszCmd += (pszCmd[1] == 'c' && pszCmd[2] == 'o') ? 8 : 5; // skip -config or -cfg
+				while (*pszCmd == ' ' || *pszCmd == '\t' || *pszCmd == ':' || *pszCmd == '=') pszCmd++;
+				if (*pszCmd && *pszCmd != '-')
+				{
+					char* pDst = g_szConfigPath;
+					while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t')
+						*pDst++ = *pszCmd++;
+					*pDst = '\0';
+				}
+				break;
+			}
+			// Skip to next token
+			while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t') pszCmd++;
+		}
+	}
 
     OpenKey();
 	if (bMustSetNVidiaRegistry())

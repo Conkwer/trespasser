@@ -4,6 +4,7 @@
 #include <windows.h>
 #include "Reg.h"
 #include "RegInit.hpp"
+#include "IniFile.hpp"
 
 #define REGKEYPARENT HKEY_LOCAL_MACHINE
 #ifndef DEMO_BUILD
@@ -12,8 +13,7 @@
 #define REGLOCATION "Software\\DreamWorks Interactive\\Trespasser Demo"
 #endif
 
-#define INI_FILENAME    ".\\trespass.ini"
-#define INI_SECTION     "Settings"
+static const char* g_pszIniSection = "Settings";
 
 //
 // Module specific variables.
@@ -103,8 +103,12 @@ void OpenKey()
 	// Dummy handle — some code checks g_hKey before proceeding.
 	g_hKey = (HKEY)1;
 
+	// If no config path set by CLI, use default
+	if (g_szConfigPath[0] == '\0')
+		InitDefaultConfigPath();
+
 	// Check if INI exists — write defaults if not.
-	if (GetFileAttributes(INI_FILENAME) == 0xFFFFFFFF)
+	if (GetFileAttributes(g_szConfigPath) == 0xFFFFFFFF)
 	{
 		WriteDefaults();
 	}
@@ -122,7 +126,7 @@ void CloseKey(BOOL b_change_safemode)
 	}
 
 	// Flush INI to disk
-	WritePrivateProfileString(NULL, NULL, NULL, INI_FILENAME);
+	WritePrivateProfileString(NULL, NULL, NULL, g_szConfigPath);
 }
 
 // --- Integer values ---
@@ -131,26 +135,26 @@ void SetRegValue(LPCSTR lpszVal, int nVal)
 {
 	char szVal[32];
 	wsprintf(szVal, "%d", nVal);
-	WritePrivateProfileString(INI_SECTION, lpszVal, szVal, INI_FILENAME);
+	WritePrivateProfileString(g_pszIniSection, lpszVal, szVal, g_szConfigPath);
 }
 
 int GetRegValue(LPCSTR lpszVal, int nDefault)
 {
 	char szDefault[32];
 	wsprintf(szDefault, "%d", nDefault);
-	return GetPrivateProfileInt(INI_SECTION, lpszVal, nDefault, INI_FILENAME);
+	return GetPrivateProfileInt(g_pszIniSection, lpszVal, nDefault, g_szConfigPath);
 }
 
 // --- String values ---
 
 void SetRegString(LPCSTR lpszVal, LPCSTR lpszString)
 {
-	WritePrivateProfileString(INI_SECTION, lpszVal, lpszString, INI_FILENAME);
+	WritePrivateProfileString(g_pszIniSection, lpszVal, lpszString, g_szConfigPath);
 }
 
 int GetRegString(LPCSTR lpszVal, LPSTR lpszString, int nSize, LPCSTR lpszDefault)
 {
-	GetPrivateProfileString(INI_SECTION, lpszVal, lpszDefault, lpszString, nSize, INI_FILENAME);
+	GetPrivateProfileString(g_pszIniSection, lpszVal, lpszDefault, lpszString, nSize, g_szConfigPath);
 	return lstrlen(lpszString);
 }
 
@@ -234,5 +238,5 @@ float GetRegFloat(LPCSTR lpszVal, float fDefault)
 
 void DeleteValue(LPCSTR lpszVal)
 {
-	WritePrivateProfileString(INI_SECTION, lpszVal, NULL, INI_FILENAME);
+	WritePrivateProfileString(g_pszIniSection, lpszVal, NULL, g_szConfigPath);
 }

@@ -164,6 +164,10 @@ SOURCE=.\Source\Lib\Sys\W95\ExePageModify.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\Source\Lib\Sys\IniFile.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\Source\Lib\Sys\W95\FastHeap.cpp
 # End Source File
 # Begin Source File
