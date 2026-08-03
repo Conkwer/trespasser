@@ -1,5 +1,5 @@
 // Looping background music player.
-// OGG decoded via stb_vorbis, played via waveOut with chunked buffers.
+// OGG decoded via stb_vorbis, played via waveOut with streaming buffers.
 // Does NOT interact with the game's AudioDaemon / TPA system.
 
 #define STB_VORBIS_IMPLEMENTATION
@@ -13,16 +13,18 @@
 
 #pragma comment(lib, "winmm.lib")
 
-#define WAVCHUNK_SIZE  16384   // bytes per waveOut buffer (driver-safe)
+#define WAVCHUNK_SIZE  16384
+#define MAX_QUEUED      8       // queue only a few at a time
 
 struct BgmState
 {
 	HWAVEOUT  hWaveOut;
-	BYTE*     pData;       // WAV header + PCM (owned)
-	DWORD     dwTotalSize; // total bytes of pData
-	int       nChunks;     // number of waveOut buffers
-	WAVEHDR*  pHeaders;    // array of nChunks WAVEHDRs
-	LONG lPlaying;   // 1 = looping, 0 = stopped (accessed under CS)
+	BYTE*     pData;
+	DWORD     dwTotalSize;
+	int       nChunks;
+	WAVEHDR*  pHeaders;
+	int       iNextChunk;
+	LONG      lPlaying;
 	CRITICAL_SECTION cs;
 };
 static BgmState g;
@@ -48,23 +50,21 @@ struct WavHeader
 };
 #pragma pack(pop)
 
-// --- waveOut callback: re-queue chunk when it finishes ---
 static void CALLBACK WaveOutProc(HWAVEOUT hwo, UINT uMsg, DWORD dwInstance,
                                  DWORD dwParam1, DWORD dwParam2)
 {
 	if (uMsg != WOM_DONE) return;
-	WAVEHDR* pHdr = (WAVEHDR*)dwParam1;
-
 	EnterCriticalSection(&g.cs);
 	if (g.lPlaying && g.hWaveOut)
 	{
-		// Re-queue this chunk for seamless looping
-		waveOutWrite(g.hWaveOut, pHdr, sizeof(WAVEHDR));
+		// Queue the next chunk in sequence (or re-queue for loop)
+		waveOutWrite(g.hWaveOut, &g.pHeaders[g.iNextChunk], sizeof(WAVEHDR));
+		g.iNextChunk++;
+		if (g.iNextChunk >= g.nChunks) g.iNextChunk = 0;
 	}
 	LeaveCriticalSection(&g.cs);
 }
 
-//-----------------------------------------------------------------------------
 CBackgroundMusic::CBackgroundMusic()
 {
 	m_bPlaying = false;
@@ -96,7 +96,6 @@ static void FreeBgmState()
 	LeaveCriticalSection(&g.cs);
 }
 
-//-----------------------------------------------------------------------------
 bool CBackgroundMusic::Play(const char* pszFilename)
 {
 	BgmLog("Play(%s)", pszFilename);
@@ -108,7 +107,7 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 	if (GetFileAttributes(pszFilename) == 0xFFFFFFFF)
 		return false;
 
-	// --- Load/decode into memory ---
+	// --- Load/decode ---
 	DWORD dwTotalSize;
 	if (lstrcmpi(pszExt, ".wav") == 0)
 	{
@@ -128,37 +127,35 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 		int nSamples = stb_vorbis_decode_filename(pszFilename, &channels, &sample_rate, &pcm);
 		BgmLog("  OGG: %d samples %dch %dHz", nSamples, channels, sample_rate);
 		if (nSamples <= 0) return false;
-
 		DWORD dataSize = nSamples * sizeof(short);
 		dwTotalSize = sizeof(WavHeader) + dataSize;
 		g.pData = (BYTE*)malloc(dwTotalSize);
 		if (!g.pData) { free(pcm); return false; }
-
 		WavHeader* pHdr = (WavHeader*)g.pData;
 		ZeroMemory(pHdr, sizeof(WavHeader));
-		memcpy(pHdr->riff,  "RIFF", 4);  pHdr->fileSize = dwTotalSize - 8;
-		memcpy(pHdr->wave,  "WAVE", 4);  memcpy(pHdr->fmt, "fmt ", 4);
-		pHdr->fmtSize = 16;              pHdr->formatTag = 1;
-		pHdr->channels = (WORD)channels; pHdr->sampleRate = sample_rate;
-		pHdr->bitsPerSample = 16;        pHdr->blockAlign = (WORD)(channels * 2);
+		memcpy(pHdr->riff, "RIFF", 4);  pHdr->fileSize = dwTotalSize - 8;
+		memcpy(pHdr->wave, "WAVE", 4);  memcpy(pHdr->fmt, "fmt ", 4);
+		pHdr->fmtSize = 16;  pHdr->formatTag = 1;
+		pHdr->channels = (WORD)channels;  pHdr->sampleRate = sample_rate;
+		pHdr->bitsPerSample = 16;  pHdr->blockAlign = (WORD)(channels * 2);
 		pHdr->bytesPerSec = sample_rate * channels * 2;
-		memcpy(pHdr->data, "data", 4);   pHdr->dataSize = dataSize;
+		memcpy(pHdr->data, "data", 4);  pHdr->dataSize = dataSize;
 		memcpy(g.pData + sizeof(WavHeader), pcm, dataSize);
 		free(pcm);
 	}
 	g.dwTotalSize = dwTotalSize;
-	BgmLog("  total WAV bytes: %d", dwTotalSize);
+	BgmLog("  total bytes: %d", dwTotalSize);
 
 	// --- Open waveOut ---
 	WavHeader* pHdr = (WavHeader*)g.pData;
 	WAVEFORMATEX wfx;
-	wfx.wFormatTag = WAVE_FORMAT_PCM;
-	wfx.nChannels = pHdr->channels;
-	wfx.nSamplesPerSec = pHdr->sampleRate;
-	wfx.wBitsPerSample = pHdr->bitsPerSample;
-	wfx.nBlockAlign = pHdr->blockAlign;
+	wfx.wFormatTag      = WAVE_FORMAT_PCM;
+	wfx.nChannels       = pHdr->channels;
+	wfx.nSamplesPerSec  = pHdr->sampleRate;
+	wfx.wBitsPerSample  = pHdr->bitsPerSample;
+	wfx.nBlockAlign     = pHdr->blockAlign;
 	wfx.nAvgBytesPerSec = pHdr->bytesPerSec;
-	wfx.cbSize = 0;
+	wfx.cbSize          = 0;
 
 	if (waveOutOpen(&g.hWaveOut, WAVE_MAPPER, &wfx,
 	                (DWORD)WaveOutProc, 0, CALLBACK_FUNCTION) != MMSYSERR_NOERROR)
@@ -168,51 +165,45 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 		return false;
 	}
 
-	// --- Chunk up the data ---
+	// --- Prepare all headers ---
 	g.nChunks = (dwTotalSize + WAVCHUNK_SIZE - 1) / WAVCHUNK_SIZE;
 	g.pHeaders = new WAVEHDR[g.nChunks];
 	ZeroMemory(g.pHeaders, sizeof(WAVEHDR) * g.nChunks);
-
 	BYTE* pData = g.pData;
-	DWORD dwRemaining = dwTotalSize;
-
+	DWORD dwRem = dwTotalSize;
 	for (int i = 0; i < g.nChunks; i++)
 	{
-		DWORD dwChunk = (dwRemaining < WAVCHUNK_SIZE) ? dwRemaining : WAVCHUNK_SIZE;
+		DWORD dwChunk = (dwRem < WAVCHUNK_SIZE) ? dwRem : WAVCHUNK_SIZE;
 		g.pHeaders[i].lpData = (LPSTR)pData;
 		g.pHeaders[i].dwBufferLength = dwChunk;
 		g.pHeaders[i].dwFlags = 0;
-
 		if (waveOutPrepareHeader(g.hWaveOut, &g.pHeaders[i], sizeof(WAVEHDR)) != MMSYSERR_NOERROR)
 		{
 			BgmLog("  FAIL: PrepareHeader[%d]", i);
-			FreeBgmState();
-			return false;
+			FreeBgmState(); return false;
 		}
-
-		pData += dwChunk;
-		dwRemaining -= dwChunk;
+		pData += dwChunk; dwRem -= dwChunk;
 	}
+	BgmLog("  %d chunks prepared", g.nChunks);
 
-	// --- Queue all chunks ---
+	// --- Queue only MAX_QUEUED chunks initially, callback queues the rest ---
 	InterlockedExchange(&g.lPlaying, 1);
-	for (int j = 0; j < g.nChunks; j++)
+	int nQueued = 0;
+	int j;
+	for (j = 0; j < MAX_QUEUED && j < g.nChunks; j++)
 	{
 		if (waveOutWrite(g.hWaveOut, &g.pHeaders[j], sizeof(WAVEHDR)) != MMSYSERR_NOERROR)
-		{
-			BgmLog("  FAIL: waveOutWrite[%d]", j);
-			InterlockedExchange(&g.lPlaying, 0);
-			FreeBgmState();
-			return false;
-		}
+			break;
+		nQueued++;
 	}
+	g.iNextChunk = j;
+	if (g.iNextChunk >= g.nChunks) g.iNextChunk = 0;
 
 	m_bPlaying = true;
-	BgmLog("  SUCCESS: %d chunks queued", g.nChunks);
+	BgmLog("  SUCCESS: %d/%d chunks queued, next=%d", nQueued, g.nChunks, g.iNextChunk);
 	return true;
 }
 
-//-----------------------------------------------------------------------------
 void CBackgroundMusic::Stop()
 {
 	if (!m_bPlaying && !g.hWaveOut) return;
@@ -222,5 +213,4 @@ void CBackgroundMusic::Stop()
 	m_bPlaying = false;
 }
 
-//-----------------------------------------------------------------------------
 CBackgroundMusic g_BackgroundMusic;

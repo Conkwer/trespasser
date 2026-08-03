@@ -23,6 +23,7 @@
 #include "..\Lib\Sys\reg.h"
 #include "..\lib\sys\reginit.hpp"
 #include "..\Lib\Sys\IniFile.hpp"
+#include "..\Lib\Audio\BackgroundMusic.hpp"
 #include "supportfn.hpp"
 #include "tpassglobals.h"
 #include "gblinc/buildver.hpp"
@@ -687,6 +688,7 @@ DoRestartWithRenderDlg:
     iRet = 1;
 
 Cleanup:
+    g_BackgroundMusic.Stop();
 
     if (DirectDraw::pdd)
     {
