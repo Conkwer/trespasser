@@ -84,6 +84,9 @@ static void WriteDefaults()
 	SetRegValue(REG_KEY_AUDIO_SUBTITLES,      0);
 	SetRegValue(REG_KEY_AUDIO_ENABLE3D,       -1);
 
+	// Background music
+	SetRegValue("EnableBackgroundMusic",       1);
+
 	// Gameplay
 	SetRegValue(REG_KEY_GORE,                 3);
 	SetRegValue(REG_KEY_INVERTMOUSE,          0);
