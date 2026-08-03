@@ -306,15 +306,23 @@ int CTPassGlobals::LoadLevel(LPCSTR pszName)
     // BUGBUG:  Hack to get data drive location
     GetRegString(REG_KEY_DATA_DRIVE, szFile, sizeof(szFile), "");
 
-	// Per-level background music override: data/<level>.ogg
+	// Per-level background music override: try data/<level>.ogg then <level>.ogg
 	g_BackgroundMusic.Stop();
 	if (GetRegValue("EnableBackgroundMusic", 1))
 	{
+		// Try data/<level>.ogg first
 		lstrcpy(szMusic, szFile);
 		lstrcat(szMusic, "data\\");
 		lstrcat(szMusic, pszName);
 		lstrcat(szMusic, ".ogg");
-		if (g_BackgroundMusic.Play(szMusic))
+
+		// Also try root directory (next to exe)
+		char szMusic2[_MAX_PATH];
+		lstrcpy(szMusic2, szFile);
+		lstrcat(szMusic2, pszName);
+		lstrcat(szMusic2, ".ogg");
+
+		if (g_BackgroundMusic.Play(szMusic) || g_BackgroundMusic.Play(szMusic2))
 		{
 			SetRegValue(REG_KEY_AUDIO_MUSIC, 0);
 		}

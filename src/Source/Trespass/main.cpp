@@ -431,31 +431,36 @@ int DoWinMain(HINSTANCE hInstance,
     g_hInst = hInstance;
     bUseGDIForMessages = false;
 
-	// Parse command line for -config/-cfg flag
+	// Parse command line for -config, --config, -cfg, --cfg
 	{
 		char* pszCmd = lpCmdLine;
 		while (*pszCmd)
 		{
-			// Skip whitespace
 			while (*pszCmd == ' ' || *pszCmd == '\t') pszCmd++;
 			if (!*pszCmd) break;
 
-			// Check for -config or -cfg
-			if ((pszCmd[0] == '-' || pszCmd[0] == '/') &&
-			    (lstrcmpi(pszCmd+1, "config") == 0 || lstrcmpi(pszCmd+1, "cfg") == 0))
+			if (pszCmd[0] == '-' || pszCmd[0] == '/')
 			{
-				pszCmd += (pszCmd[1] == 'c' && pszCmd[2] == 'o') ? 8 : 5; // skip -config or -cfg
-				while (*pszCmd == ' ' || *pszCmd == '\t' || *pszCmd == ':' || *pszCmd == '=') pszCmd++;
-				if (*pszCmd && *pszCmd != '-')
+				int nDash = 1;
+				if (pszCmd[1] == '-') nDash = 2;
+				int nMatch = 0;
+				if (_strnicmp(pszCmd + nDash, "config", 6) == 0) nMatch = 6;
+				else if (_strnicmp(pszCmd + nDash, "cfg", 3) == 0) nMatch = 3;
+
+				if (nMatch > 0)
 				{
-					char* pDst = g_szConfigPath;
-					while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t')
-						*pDst++ = *pszCmd++;
-					*pDst = '\0';
+					pszCmd += nDash + nMatch;
+					while (*pszCmd == ' ' || *pszCmd == '\t' || *pszCmd == ':' || *pszCmd == '=') pszCmd++;
+					if (*pszCmd && *pszCmd != '-')
+					{
+						char* pDst = g_szConfigPath;
+						while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t')
+							*pDst++ = *pszCmd++;
+						*pDst = '\0';
+					}
+					break;
 				}
-				break;
 			}
-			// Skip to next token
 			while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t') pszCmd++;
 		}
 	}
