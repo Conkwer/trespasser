@@ -5,10 +5,6 @@ Project is not related to [OpenTrespasser](https://github.com/OpenTrespasser/Jur
 
 **Game assets are not included.** You must own the original CD (v1.0 retail, 1998) and copy the data files to use the compiled binary.
 
-## Philosophy
-
-DirectX12 and graphic overhaul are not planned.
-
 ## Quick Start
 
 Pre-compiled binaries are in [`dist/`](dist/):
@@ -29,6 +25,10 @@ See [`BUILD.md`](BUILD.md) for the full toolchain setup, build commands, and det
 2. **Processor detection bypass** — modern CPUs are unrecognizable to 1998 CPUID
 3. **ESC menu instant-close** — dialog no longer closes on the same keypress that opened it
 4. **MFC paths** — resource compiler include/lib configuration
+
+## Philosophy
+
+DirectX12 and graphic overhauls are not planned.
 
 ## Status
 
