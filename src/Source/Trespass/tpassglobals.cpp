@@ -315,7 +315,7 @@ int CTPassGlobals::LoadLevel(LPCSTR pszName)
 		char* pDot = strrchr(szBase, '.');
 		if (pDot) *pDot = '\0';
 
-		static const char* exts[] = { ".cau", ".ogg", ".wav" };
+		static const char* exts[] = { ".cau", ".adx", ".wav", ".ogg" };
 		for (int e = 0; e < 3; e++)
 		{
 			lstrcpy(szMusic, szFile);

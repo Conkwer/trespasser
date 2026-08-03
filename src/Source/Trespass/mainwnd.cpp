@@ -23,6 +23,7 @@
 #include "tpassglobals.h"
 #include "..\Lib\Sys\reg.h"
 #include "..\lib\sys\reginit.hpp"
+#include "..\Lib\Audio\BackgroundMusic.hpp"
 #include "uiwnd.h"
 #include "uidlgs.h"
 #include "video.h"
@@ -636,6 +637,23 @@ void CMainWnd::GameLoop()
         switch(i)
         {
             case 1:
+				// Stop level BGM, try to play menu music
+				g_BackgroundMusic.Stop();
+				if (GetRegValue("EnableBackgroundMusic", 1))
+				{
+					static const char* menuExts[] = { ".adx", ".wav", ".cau", ".ogg" };
+					char szBase[_MAX_PATH];
+					GetRegString(REG_KEY_DATA_DRIVE, szBase, sizeof(szBase), "");
+					for (int me = 0; me < 3; me++)
+					{
+						char szMenu[_MAX_PATH];
+						lstrcpy(szMenu, szBase);
+						lstrcat(szMenu, "data\\menu");
+						lstrcat(szMenu, menuExts[me]);
+						if (g_BackgroundMusic.Play(szMenu))
+							break;
+					}
+				}
                 puiwnd = new CMainScreenWnd(m_pUIMgr);
                 break;
 
