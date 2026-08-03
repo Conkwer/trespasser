@@ -202,14 +202,6 @@ SOURCE=.\Source\Lib\Audio\SoundDefs.hpp
 
 SOURCE=.\Source\Lib\Audio\SoundTypes.hpp
 # End Source File
-# Begin Source File
-
-SOURCE=.\Source\Lib\Audio\BackgroundMusic.cpp
-# End Source File
-# Begin Source File
-
-SOURCE=.\Source\Lib\Audio\BackgroundMusic.hpp
-# End Source File
 # End Group
 # Begin Group "Resource Files"
 

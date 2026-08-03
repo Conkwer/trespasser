@@ -301,39 +301,9 @@ int CTPassGlobals::LoadLevel(LPCSTR pszName)
 {
     int     iRet;
     char    szFile[_MAX_PATH];
-    char    szMusic[_MAX_PATH];
 
     // BUGBUG:  Hack to get data drive location
     GetRegString(REG_KEY_DATA_DRIVE, szFile, sizeof(szFile), "");
-
-	// Per-level background music override: try data/<basename>.ogg then <basename>.ogg
-	// Strip .SCN extension from level name (e.g. "BE.SCN" -> "BE")
-	g_BackgroundMusic.Stop();
-	if (GetRegValue("EnableBackgroundMusic", 1))
-	{
-		char szBaseName[_MAX_PATH];
-		lstrcpy(szBaseName, pszName);
-		char* pDot = strrchr(szBaseName, '.');
-		if (pDot) *pDot = '\0';
-
-		// Try data/<basename>.ogg first
-		lstrcpy(szMusic, szFile);
-		lstrcat(szMusic, "data\\");
-		lstrcat(szMusic, szBaseName);
-		lstrcat(szMusic, ".ogg");
-
-		// Also try root directory (next to exe)
-		char szMusic2[_MAX_PATH];
-		lstrcpy(szMusic2, szFile);
-		lstrcat(szMusic2, szBaseName);
-		lstrcat(szMusic2, ".ogg");
-
-		if (g_BackgroundMusic.Play(szMusic) || g_BackgroundMusic.Play(szMusic2))
-		{
-			SetRegValue(REG_KEY_AUDIO_MUSIC, 0);
-		}
-	}
-
     strcat(szFile, "data\\");
     strcat(szFile, pszName);
 
