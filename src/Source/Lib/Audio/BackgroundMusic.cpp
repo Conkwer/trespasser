@@ -1,6 +1,6 @@
-// Simple looping background music player.
-// WAV: plays directly via PlaySound from file.
-// OGG: decodes via stb_vorbis to a temp WAV, plays from file.
+// Looping background music player.
+// OGG decoded via stb_vorbis, played via waveOut (no size limit).
+// WAV files played directly.
 //
 // Does NOT interact with the game's AudioDaemon / TPA system.
 
@@ -15,7 +15,27 @@
 
 #pragma comment(lib, "winmm.lib")
 
-// WAV file header structure (44 bytes before PCM data)
+static HWAVEOUT  g_hWaveOut  = NULL;
+static WAVEHDR   g_WaveHdr;
+static BYTE*     g_pWaveData = NULL;  // WAV header + PCM
+static bool      g_bLooping  = false;
+static CRITICAL_SECTION g_cs;
+
+static void BgmLog(const char* fmt, ...)
+{
+	FILE* f = fopen("bgmusic.log", "a");
+	if (f)
+	{
+		va_list args;
+		va_start(args, fmt);
+		vfprintf(f, fmt, args);
+		va_end(args);
+		fprintf(f, "\n");
+		fclose(f);
+	}
+}
+
+// WAV header (44 bytes)
 #pragma pack(push, 1)
 struct WavHeader
 {
@@ -35,20 +55,16 @@ struct WavHeader
 };
 #pragma pack(pop)
 
-static char g_szTempWav[MAX_PATH] = "";
-
-// Write to bgmusic.log for debugging (Release builds can't attach debugger)
-static void BgmLog(const char* fmt, ...)
+// waveOut callback — re-queue buffer for looping
+static void CALLBACK WaveOutProc(HWAVEOUT hwo, UINT uMsg, DWORD dwInstance,
+                                 DWORD dwParam1, DWORD dwParam2)
 {
-	FILE* f = fopen("bgmusic.log", "a");
-	if (f)
+	if (uMsg == WOM_DONE && g_bLooping)
 	{
-		va_list args;
-		va_start(args, fmt);
-		vfprintf(f, fmt, args);
-		va_end(args);
-		fprintf(f, "\n");
-		fclose(f);
+		EnterCriticalSection(&g_cs);
+		if (g_bLooping && g_hWaveOut)
+			waveOutWrite(g_hWaveOut, &g_WaveHdr, sizeof(g_WaveHdr));
+		LeaveCriticalSection(&g_cs);
 	}
 }
 
@@ -56,11 +72,13 @@ static void BgmLog(const char* fmt, ...)
 CBackgroundMusic::CBackgroundMusic()
 {
 	m_bPlaying = false;
+	InitializeCriticalSection(&g_cs);
 }
 
 CBackgroundMusic::~CBackgroundMusic()
 {
 	Stop();
+	DeleteCriticalSection(&g_cs);
 }
 
 //-----------------------------------------------------------------------------
@@ -72,105 +90,140 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 	const char* pszExt = strrchr(pszFilename, '.');
 	if (!pszExt || (lstrcmpi(pszExt, ".ogg") != 0 && lstrcmpi(pszExt, ".wav") != 0))
 	{
-		BgmLog("  FAIL: bad extension '%s'", pszExt ? pszExt : "null");
+		BgmLog("  FAIL: bad extension");
 		return false;
 	}
 
-	DWORD dwAttr = GetFileAttributes(pszFilename);
-	if (dwAttr == 0xFFFFFFFF)
+	if (GetFileAttributes(pszFilename) == 0xFFFFFFFF)
 	{
-		BgmLog("  FAIL: file not found (err=%d)", GetLastError());
+		BgmLog("  FAIL: file not found");
 		return false;
 	}
-	BgmLog("  file found, size=%d", dwAttr); // not actually size but confirms exists
+	BgmLog("  file found");
 
-	// WAV: play directly from file
+	// --- WAV: read file into memory for waveOut ---
 	if (lstrcmpi(pszExt, ".wav") == 0)
 	{
-		BOOL bOk = PlaySound(pszFilename, NULL, SND_FILENAME | SND_LOOP | SND_ASYNC);
-		BgmLog("  WAV PlaySound(file)=%d", bOk);
-		if (!bOk) return false;
-		m_bPlaying = true;
-		return true;
+		HANDLE hFile = CreateFile(pszFilename, GENERIC_READ, FILE_SHARE_READ,
+		                          NULL, OPEN_EXISTING, 0, NULL);
+		if (hFile == INVALID_HANDLE_VALUE)
+			return false;
+
+		DWORD dwSize = GetFileSize(hFile, NULL);
+		g_pWaveData = (BYTE*)malloc(dwSize);
+		if (!g_pWaveData) { CloseHandle(hFile); return false; }
+
+		ReadFile(hFile, g_pWaveData, dwSize, &dwSize, NULL);
+		CloseHandle(hFile);
 	}
-
-	// OGG: decode to PCM, write temp WAV, play from file
-	int channels, sample_rate;
-	short* pcm;
-	int nSamples = stb_vorbis_decode_filename(pszFilename, &channels, &sample_rate, &pcm);
-	BgmLog("  OGG decode: samples=%d ch=%d rate=%d", nSamples, channels, sample_rate);
-	if (nSamples <= 0)
+	else
 	{
-		BgmLog("  FAIL: stb_vorbis decode failed");
-		return false;
-	}
+		// --- OGG: decode to PCM, wrap in WAV header ---
+		int channels, sample_rate;
+		short* pcm;
+		int nSamples = stb_vorbis_decode_filename(pszFilename, &channels, &sample_rate, &pcm);
+		BgmLog("  OGG decode: samples=%d ch=%d rate=%d", nSamples, channels, sample_rate);
+		if (nSamples <= 0) return false;
 
-	// Build temp WAV path
-	GetTempPath(MAX_PATH, g_szTempWav);
-	lstrcat(g_szTempWav, "tp_bgm.wav");
-	BgmLog("  temp wav: %s", g_szTempWav);
+		DWORD dataSize = nSamples * sizeof(short);
+		DWORD totalSize = sizeof(WavHeader) + dataSize;
+		g_pWaveData = (BYTE*)malloc(totalSize);
+		if (!g_pWaveData) { free(pcm); return false; }
 
-	DWORD dataSize = nSamples * sizeof(short);
-
-	HANDLE hFile = CreateFile(g_szTempWav, GENERIC_WRITE, 0, NULL,
-	                          CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hFile == INVALID_HANDLE_VALUE)
-	{
-		BgmLog("  FAIL: cannot create temp wav (err=%d)", GetLastError());
+		WavHeader* pHdr = (WavHeader*)g_pWaveData;
+		ZeroMemory(pHdr, sizeof(WavHeader));
+		memcpy(pHdr->riff,  "RIFF", 4);
+		pHdr->fileSize     = totalSize - 8;
+		memcpy(pHdr->wave,  "WAVE", 4);
+		memcpy(pHdr->fmt,   "fmt ", 4);
+		pHdr->fmtSize      = 16;
+		pHdr->formatTag    = 1;
+		pHdr->channels     = (WORD)channels;
+		pHdr->sampleRate   = sample_rate;
+		pHdr->bitsPerSample = 16;
+		pHdr->blockAlign   = (WORD)(channels * 2);
+		pHdr->bytesPerSec  = sample_rate * channels * 2;
+		memcpy(pHdr->data,  "data", 4);
+		pHdr->dataSize     = dataSize;
+		memcpy(g_pWaveData + sizeof(WavHeader), pcm, dataSize);
 		free(pcm);
+		BgmLog("  wrote %d bytes in-memory WAV", totalSize);
+	}
+
+	// --- open waveOut device ---
+	WavHeader* pHdr = (WavHeader*)g_pWaveData;
+	WAVEFORMATEX wfx;
+	wfx.wFormatTag      = WAVE_FORMAT_PCM;
+	wfx.nChannels       = pHdr->channels;
+	wfx.nSamplesPerSec  = pHdr->sampleRate;
+	wfx.wBitsPerSample  = pHdr->bitsPerSample;
+	wfx.nBlockAlign     = pHdr->blockAlign;
+	wfx.nAvgBytesPerSec = pHdr->bytesPerSec;
+	wfx.cbSize          = 0;
+
+	MMRESULT mmr = waveOutOpen(&g_hWaveOut, WAVE_MAPPER, &wfx,
+	                           (DWORD)WaveOutProc, 0, CALLBACK_FUNCTION);
+	if (mmr != MMSYSERR_NOERROR)
+	{
+		BgmLog("  FAIL: waveOutOpen error %d", mmr);
+		free(g_pWaveData); g_pWaveData = NULL;
 		return false;
 	}
 
-	WavHeader hdr;
-	ZeroMemory(&hdr, sizeof(hdr));
-	memcpy(hdr.riff,  "RIFF", 4);
-	hdr.fileSize     = sizeof(WavHeader) + dataSize - 8;
-	memcpy(hdr.wave,  "WAVE", 4);
-	memcpy(hdr.fmt,   "fmt ", 4);
-	hdr.fmtSize      = 16;
-	hdr.formatTag    = 1;
-	hdr.channels     = (WORD)channels;
-	hdr.sampleRate   = sample_rate;
-	hdr.bitsPerSample = 16;
-	hdr.blockAlign   = (WORD)(channels * 2);
-	hdr.bytesPerSec  = sample_rate * channels * 2;
-	memcpy(hdr.data,  "data", 4);
-	hdr.dataSize     = dataSize;
+	// --- prepare and queue buffer ---
+	DWORD dwTotalSize = sizeof(WavHeader) + pHdr->dataSize;
+	ZeroMemory(&g_WaveHdr, sizeof(g_WaveHdr));
+	g_WaveHdr.lpData         = (LPSTR)g_pWaveData;
+	g_WaveHdr.dwBufferLength = dwTotalSize;
+	g_WaveHdr.dwFlags        = 0;
 
-	DWORD dwWritten;
-	WriteFile(hFile, &hdr, sizeof(hdr), &dwWritten, NULL);
-	WriteFile(hFile, pcm, dataSize, &dwWritten, NULL);
-	CloseHandle(hFile);
-	free(pcm);
-	BgmLog("  wrote %d bytes to temp wav", sizeof(WavHeader) + dataSize);
-
-	BOOL bOk = PlaySound(g_szTempWav, NULL, SND_FILENAME | SND_LOOP | SND_ASYNC);
-	BgmLog("  PlaySound(file)=%d", bOk);
-	if (!bOk)
+	mmr = waveOutPrepareHeader(g_hWaveOut, &g_WaveHdr, sizeof(g_WaveHdr));
+	if (mmr != MMSYSERR_NOERROR)
 	{
-		BgmLog("  FAIL: PlaySound error %d", GetLastError());
-		DeleteFile(g_szTempWav);
-		g_szTempWav[0] = '\0';
+		BgmLog("  FAIL: waveOutPrepareHeader error %d", mmr);
+		waveOutClose(g_hWaveOut); g_hWaveOut = NULL;
+		free(g_pWaveData); g_pWaveData = NULL;
+		return false;
+	}
+
+	g_bLooping = true;
+	mmr = waveOutWrite(g_hWaveOut, &g_WaveHdr, sizeof(g_WaveHdr));
+	if (mmr != MMSYSERR_NOERROR)
+	{
+		BgmLog("  FAIL: waveOutWrite error %d", mmr);
+		waveOutUnprepareHeader(g_hWaveOut, &g_WaveHdr, sizeof(g_WaveHdr));
+		waveOutClose(g_hWaveOut); g_hWaveOut = NULL;
+		free(g_pWaveData); g_pWaveData = NULL;
 		return false;
 	}
 
 	m_bPlaying = true;
-	BgmLog("  SUCCESS: playing");
+	BgmLog("  SUCCESS: playing (waveOut)");
 	return true;
 }
 
 //-----------------------------------------------------------------------------
 void CBackgroundMusic::Stop()
 {
-	if (m_bPlaying) BgmLog("Stop()");
-	PlaySound(NULL, NULL, 0);
+	if (!m_bPlaying && !g_hWaveOut) return;
+	BgmLog("Stop()");
 
-	if (g_szTempWav[0])
+	EnterCriticalSection(&g_cs);
+	g_bLooping = false;
+	if (g_hWaveOut)
 	{
-		DeleteFile(g_szTempWav);
-		g_szTempWav[0] = '\0';
+		waveOutReset(g_hWaveOut);
+		waveOutUnprepareHeader(g_hWaveOut, &g_WaveHdr, sizeof(g_WaveHdr));
+		waveOutClose(g_hWaveOut);
+		g_hWaveOut = NULL;
 	}
+	LeaveCriticalSection(&g_cs);
 
+	if (g_pWaveData)
+	{
+		free(g_pWaveData);
+		g_pWaveData = NULL;
+	}
 	m_bPlaying = false;
 }
 
