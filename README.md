@@ -1,7 +1,7 @@
 # 🦖 Trespasser-Plus
-
-Trespasser in all it C++98 glory.    
-Project is not related to [OpenTrespasser](https://github.com/OpenTrespasser/JurassicParkTrespasser) and follow the original Trespasser's pipeline.
+  
+Project is not related to [OpenTrespasser](https://github.com/OpenTrespasser/JurassicParkTrespasser) and follow the original Trespasser's pipeline.   
+You need a vintage hardware to compile this.    
 
 **Game assets are not included.** You must own the original CD (v1.0 retail, 1998) and copy the data files to use the compiled binary.
 
