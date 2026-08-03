@@ -27,6 +27,7 @@
 #include "keyremap.h"
 #include "..\Lib\Sys\reg.h"
 #include "..\lib\sys\reginit.hpp"
+#include "..\Lib\Audio\BackgroundMusic.hpp"
 #include "..\Lib\EntityDBase\MessageTypes\MsgStep.hpp"
 #include "..\Game\AI\AIMain.hpp"
 
@@ -640,6 +641,8 @@ void CGameWnd::OnKey(UINT vk, BOOL fDown, int cRepeat, UINT flags)
 
 void CGameWnd::InnerLoopCall()
 {
+    g_BackgroundMusic.InnerLoopCall();
+
     if (m_bPaused)
     {
         return;

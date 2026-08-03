@@ -306,8 +306,7 @@ int CTPassGlobals::LoadLevel(LPCSTR pszName)
     // BUGBUG:  Hack to get data drive location
     GetRegString(REG_KEY_DATA_DRIVE, szFile, sizeof(szFile), "");
 
-	// Per-level background music via DirectSound
-	// Strip .SCN from level name, look for <name>.ogg or <name>.wav
+	// Per-level background music: try .cau, .ogg, .wav
 	g_BackgroundMusic.Stop();
 	if (GetRegValue("EnableBackgroundMusic", 1))
 	{
@@ -316,15 +315,15 @@ int CTPassGlobals::LoadLevel(LPCSTR pszName)
 		char* pDot = strrchr(szBase, '.');
 		if (pDot) *pDot = '\0';
 
-		lstrcpy(szMusic, szFile);
-		lstrcat(szMusic, "data\\");
-		lstrcat(szMusic, szBase);
-		lstrcat(szMusic, ".ogg");
-		if (!g_BackgroundMusic.Play(szMusic))
+		static const char* exts[] = { ".cau", ".ogg", ".wav" };
+		for (int e = 0; e < 3; e++)
 		{
-			szMusic[lstrlen(szFile) + 5 + lstrlen(szBase)] = '\0';
-			lstrcat(szMusic, ".wav");
-			g_BackgroundMusic.Play(szMusic);
+			lstrcpy(szMusic, szFile);
+			lstrcat(szMusic, "data\\");
+			lstrcat(szMusic, szBase);
+			lstrcat(szMusic, exts[e]);
+			if (g_BackgroundMusic.Play(szMusic))
+				break;
 		}
 	}
 

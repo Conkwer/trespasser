@@ -8,6 +8,7 @@ public:
 	~CBackgroundMusic();
 	bool Play(const char* pszFilename);
 	void Stop();
+	void InnerLoopCall();  // call each frame to self-heal interruptions
 	bool IsPlaying() const { return m_bPlaying; }
 private:
 	bool m_bPlaying;

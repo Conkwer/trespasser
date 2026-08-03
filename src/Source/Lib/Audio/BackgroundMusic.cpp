@@ -1,6 +1,5 @@
-// Looping background music via DirectSound.
-// WAV played directly. OGG decoded via stb_vorbis, wrapped in WAV header.
-// DirectSound secondary buffer has no practical size limit for our use.
+// Looping background music via DirectSound with CTRLFREQUENCY lock.
+// Supports .ogg (stb_vorbis), .wav (PCM), .cau (IMA ADPCM — own decoder).
 
 #define STB_VORBIS_IMPLEMENTATION
 #include "stb_vorbis.c"
@@ -12,30 +11,128 @@
 
 #include "BackgroundMusic.hpp"
 
-extern HWND g_hwnd;  // game's main window (main.cpp)
+extern HWND g_hwnd;
+
 static LPDIRECTSOUND       g_pDS     = NULL;
 static LPDIRECTSOUNDBUFFER g_pDSBuf  = NULL;
+static DWORD               g_dwRate  = 0;
+static bool                g_bHaveDS = false;
 
 static void BgmLog(const char* fmt, ...)
 {
 	FILE* f = fopen("bgmusic.log", "a");
 	if (f) {
-		va_list args; va_start(args, fmt);
-		vfprintf(f, fmt, args); va_end(args);
+		va_list a; va_start(a, fmt);
+		vfprintf(f, fmt, a); va_end(a);
 		fprintf(f, "\n"); fclose(f);
 	}
 }
 
-#pragma pack(push, 1)
-struct WavHeader
-{
-	char    riff[4]; DWORD fileSize; char wave[4];
-	char    fmt[4];  DWORD fmtSize;  WORD formatTag;
-	WORD    channels;   DWORD sampleRate;
-	DWORD   bytesPerSec; WORD blockAlign; WORD bitsPerSample;
-	char    data[4]; DWORD dataSize;
+// --- IMA ADPCM decoder tables (same as AudioADPCM.cpp) ---
+static const int i4Step[89] = {
+	7,8,9,10,11,12,13,14,16,17,19,21,23,25,28,31,34,37,41,45,50,
+	55,60,66,73,80,88,97,107,118,130,143,157,173,190,209,230,253,
+	279,307,337,371,408,449,494,544,598,658,724,796,876,963,1060,
+	1166,1282,1411,1552,1707,1878,2066,2272,2499,2749,3024,3327,
+	3660,4026,4428,4871,5358,5894,6484,7132,7845,8630,9493,10442,
+	11487,12635,13899,15289,16818,18500,20350,22385,24623,27086,
+	29794,32767
 };
-#pragma pack(pop)
+static const int i4NextStep[256] = {
+	-1,-1,-1,-1,2,4,6,8, -1,-1,-1,-1,2,4,6,8,
+	-1,-1,-1,-1,2,4,6,8, -1,-1,-1,-1,2,4,6,8,
+	-1,-1,-1,-1,2,4,6,8, -1,-1,-1,-1,2,4,6,8,
+	-1,-1,-1,-1,2,4,6,8, -1,-1,-1,-1,2,4,6,8,
+	-1,-1,-1,-1,2,4,6,8, -1,-1,-1,-1,2,4,6,8,
+	-1,-1,-1,-1,2,4,6,8, -1,-1,-1,-1,2,4,6,8,
+	-1,-1,-1,-1,2,4,6,8, -1,-1,-1,-1,2,4,6,8,
+	-1,-1,-1,-1,2,4,6,8, -1,-1,-1,-1,2,4,6,8
+};
+
+// CAU file header (36 bytes, little-endian)
+struct CAUHeader
+{
+	DWORD magic;       // 'ROBW'
+	DWORD version;
+	DWORD offset;      // offset to sample data
+	DWORD blockAlign;  // ADPCM block alignment
+	DWORD dataSize;    // compressed data size
+	DWORD decompSize;  // decompressed size in bytes
+	DWORD frequency;
+	BYTE  bits;
+	BYTE  channels;
+	BYTE  compression; // 0=PCM, 1=ADPCM, 2=voice
+	BYTE  flags;
+	DWORD subtitleOff; // subtitle data offset
+};
+
+// Decode a single IMA ADPCM nibble
+static int DecodeNibble(int nib, int* pPred, int* pIdx)
+{
+	int step = i4Step[*pIdx];
+	int diff = step >> 3;
+	if (nib & 4) diff += step;
+	if (nib & 2) diff += step >> 1;
+	if (nib & 1) diff += step >> 2;
+	if (nib & 8) diff = -diff;
+	int samp = *pPred + diff;
+	if (samp > 32767) samp = 32767;
+	else if (samp < -32768) samp = -32768;
+	*pPred = samp;
+	*pIdx += i4NextStep[nib & 0xF];
+	if (*pIdx < 0) *pIdx = 0;
+	else if (*pIdx > 88) *pIdx = 88;
+	return samp;
+}
+
+// Decode stereo 16-bit IMA ADPCM to interleaved PCM
+static DWORD DecodeADPCM(BYTE* pSrc, DWORD srcSize, DWORD blockAlign,
+                          BYTE* pDst, DWORD dstMax)
+{
+	BYTE* pDstStart = pDst;
+	while (srcSize > 0 && (DWORD)(pDst - pDstStart) < dstMax)
+	{
+		DWORD block = blockAlign;
+		if (block > srcSize) block = srcSize;
+		srcSize -= block;
+		block -= 8; // 2 headers * 4 bytes
+
+		// Left channel header
+		int predL = (short)(*(WORD*)pSrc);
+		int idxL  = *(BYTE*)(pSrc + 2);
+		if (idxL > 88) idxL = 88;
+		// Right channel header
+		int predR = (short)(*(WORD*)(pSrc + 4));
+		int idxR  = *(BYTE*)(pSrc + 6);
+		if (idxR > 88) idxR = 88;
+		pSrc += 8;
+
+		// Write first samples
+		*(short*)pDst = (short)predL;
+		*(short*)(pDst+2) = (short)predR;
+		pDst += 4;
+
+		// Decode 8 bytes at a time (4 left nibbles + 4 right nibbles)
+		while (block >= 8)
+		{
+			block -= 8;
+			DWORD left  = *(DWORD*)pSrc; pSrc += 4;
+			DWORD right = *(DWORD*)pSrc; pSrc += 4;
+
+			for (int i = 0; i < 8; i++)
+			{
+				int nibL = left & 0xF; left >>= 4;
+				int nibR = right & 0xF; right >>= 4;
+				int sL = DecodeNibble(nibL, &predL, &idxL);
+				int sR = DecodeNibble(nibR, &predR, &idxR);
+				*(short*)pDst = (short)sL;
+				*(short*)(pDst+2) = (short)sR;
+				pDst += 4;
+			}
+		}
+	}
+	return (DWORD)(pDst - pDstStart);
+}
 
 CBackgroundMusic::CBackgroundMusic()  { m_bPlaying = false; }
 CBackgroundMusic::~CBackgroundMusic() { Stop(); }
@@ -46,124 +143,131 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 	Stop();
 
 	const char* pszExt = strrchr(pszFilename, '.');
-	if (!pszExt || (lstrcmpi(pszExt, ".ogg") != 0 && lstrcmpi(pszExt, ".wav") != 0))
-		return false;
+	if (!pszExt) return false;
 	if (GetFileAttributes(pszFilename) == 0xFFFFFFFF)
 		return false;
 
-	// --- Get PCM data and format ---
-	BYTE*  pPCM     = NULL;
-	DWORD  dwPCMSize = 0;
-	int    channels = 0, sampleRate = 0;
+	BYTE* pPCM = NULL; DWORD sz = 0; int ch = 0, sr = 0;
 
-	if (lstrcmpi(pszExt, ".wav") == 0)
+	if (lstrcmpi(pszExt, ".cau") == 0)
 	{
-		HANDLE hFile = CreateFile(pszFilename, GENERIC_READ, FILE_SHARE_READ,
-		                          NULL, OPEN_EXISTING, 0, NULL);
-		if (hFile == INVALID_HANDLE_VALUE) return false;
-		DWORD dwFileSize = GetFileSize(hFile, NULL);
-		BYTE* pFileData = (BYTE*)malloc(dwFileSize);
-		if (!pFileData) { CloseHandle(hFile); return false; }
-		ReadFile(hFile, pFileData, dwFileSize, &dwFileSize, NULL);
-		CloseHandle(hFile);
+		HANDLE hf = CreateFile(pszFilename, GENERIC_READ, FILE_SHARE_READ,
+		                       NULL, OPEN_EXISTING, 0, NULL);
+		if (hf == INVALID_HANDLE_VALUE) return false;
+		CAUHeader cau; DWORD br;
+		ReadFile(hf, &cau, sizeof(cau), &br, NULL);
+		if (cau.magic != 'ROBW')
+			{ BgmLog("  FAIL: bad CAU magic"); CloseHandle(hf); return false; }
+		ch = cau.channels; sr = cau.frequency;
+		BgmLog("  CAU: %dHz %dch comp=%d data=%d decomp=%d align=%d",
+		       sr, ch, cau.compression, cau.dataSize, cau.decompSize, cau.blockAlign);
 
-		WavHeader* pHdr = (WavHeader*)pFileData;
-		if (memcmp(pHdr->riff, "RIFF", 4) != 0 || pHdr->formatTag != 1)
+		if (cau.compression == 0)
 		{
-			BgmLog("  FAIL: not PCM WAV");
-			free(pFileData); return false;
+			// Raw PCM — read directly
+			sz = cau.dataSize;
+			pPCM = (BYTE*)malloc(sz);
+			SetFilePointer(hf, cau.offset, NULL, FILE_BEGIN);
+			ReadFile(hf, pPCM, sz, &br, NULL);
 		}
-		channels   = pHdr->channels;
-		sampleRate = pHdr->sampleRate;
-		dwPCMSize  = pHdr->dataSize;
-		pPCM = (BYTE*)malloc(dwPCMSize);
-		if (pPCM)
-			memcpy(pPCM, pFileData + sizeof(WavHeader), dwPCMSize);
-		free(pFileData);
+		else if (cau.compression == 1)
+		{
+			// IMA ADPCM — decode
+			BYTE* pComp = (BYTE*)malloc(cau.dataSize);
+			SetFilePointer(hf, cau.offset, NULL, FILE_BEGIN);
+			ReadFile(hf, pComp, cau.dataSize, &br, NULL);
+			sz = cau.decompSize;
+			pPCM = (BYTE*)malloc(sz + 4096);
+			DWORD dwDec = 0;
+			if (ch == 2)
+				dwDec = DecodeADPCM(pComp, cau.dataSize, cau.blockAlign, pPCM, sz);
+			if (dwDec == 0)
+				{ BgmLog("  FAIL: ADPCM decode"); free(pComp); free(pPCM); CloseHandle(hf); return false; }
+			sz = dwDec;
+			free(pComp);
+			BgmLog("  ADPCM decoded: %d bytes PCM", sz);
+		}
+		else
+			{ BgmLog("  FAIL: unknown compression %d", cau.compression); CloseHandle(hf); return false; }
+		CloseHandle(hf);
+	}
+	else if (lstrcmpi(pszExt, ".wav") == 0)
+	{
+		HANDLE hf = CreateFile(pszFilename, GENERIC_READ, FILE_SHARE_READ,
+		                       NULL, OPEN_EXISTING, 0, NULL);
+		if (hf == INVALID_HANDLE_VALUE) return false;
+		DWORD fs = GetFileSize(hf, NULL);
+		BYTE* pd = (BYTE*)malloc(fs);
+		if (!pd) { CloseHandle(hf); return false; }
+		ReadFile(hf, pd, fs, &fs, NULL); CloseHandle(hf);
+		if (memcmp(pd,"RIFF",4) || memcmp(pd+8,"WAVE",4) || *(WORD*)(pd+20)!=1)
+			{ BgmLog("  FAIL: not PCM WAV"); free(pd); return false; }
+		ch = *(WORD*)(pd+22); sr = *(DWORD*)(pd+24); sz = *(DWORD*)(pd+40);
+		pPCM = (BYTE*)malloc(sz);
+		if (pPCM) memcpy(pPCM, pd+44, sz);
+		free(pd);
+	}
+	else if (lstrcmpi(pszExt, ".ogg") == 0)
+	{
+		short* pcm; int n;
+		n = stb_vorbis_decode_filename(pszFilename, &ch, &sr, &pcm);
+		BgmLog("  OGG: %d samples %dch %dHz", n, ch, sr);
+		if (n <= 0) return false;
+		sz = n * sizeof(short);
+		pPCM = (BYTE*)pcm;
 	}
 	else
+		return false;
+
+	if (!pPCM) return false;
+	g_dwRate = sr;
+
+	if (!g_bHaveDS)
 	{
-		short* pcm;
-		int nSamples = stb_vorbis_decode_filename(pszFilename, &channels, &sampleRate, &pcm);
-		BgmLog("  OGG: %d samples %dch %dHz", nSamples, channels, sampleRate);
-		if (nSamples <= 0) return false;
-		dwPCMSize = nSamples * sizeof(short);
-		pPCM = (BYTE*)pcm;  // take ownership
+		if (FAILED(DirectSoundCreate(NULL, &g_pDS, NULL)))
+			{ BgmLog("  FAIL: DS"); free(pPCM); return false; }
+		if (FAILED(g_pDS->SetCooperativeLevel(g_hwnd, DSSCL_NORMAL)))
+			{ BgmLog("  FAIL: Coop"); g_pDS->Release(); g_pDS=NULL; free(pPCM); return false; }
+		g_bHaveDS = true;
 	}
 
-	if (!pPCM || dwPCMSize == 0) return false;
+	WAVEFORMATEX wfx; ZeroMemory(&wfx, sizeof(wfx));
+	wfx.wFormatTag=1; wfx.nChannels=(WORD)ch; wfx.nSamplesPerSec=sr;
+	wfx.wBitsPerSample=16; wfx.nBlockAlign=(WORD)(ch*2);
+	wfx.nAvgBytesPerSec=sr*ch*2;
 
-	// --- Create DirectSound ---
-	if (FAILED(DirectSoundCreate(NULL, &g_pDS, NULL)))
-	{
-		BgmLog("  FAIL: DirectSoundCreate");
-		free(pPCM); return false;
-	}
-	if (FAILED(g_pDS->SetCooperativeLevel(g_hwnd, DSSCL_NORMAL)))
-	{
-		BgmLog("  FAIL: SetCooperativeLevel");
-		g_pDS->Release(); g_pDS = NULL;
-		free(pPCM); return false;
-	}
+	DSBUFFERDESC d; ZeroMemory(&d, sizeof(d)); d.dwSize=sizeof(d);
+	d.dwFlags=DSBCAPS_GLOBALFOCUS|DSBCAPS_CTRLVOLUME|DSBCAPS_LOCSOFTWARE|DSBCAPS_CTRLFREQUENCY;
+	d.dwBufferBytes=sz; d.lpwfxFormat=&wfx;
 
-	// --- Create secondary buffer ---
-	WAVEFORMATEX wfx;
-	ZeroMemory(&wfx, sizeof(wfx));
-	wfx.wFormatTag      = WAVE_FORMAT_PCM;
-	wfx.nChannels       = (WORD)channels;
-	wfx.nSamplesPerSec  = sampleRate;
-	wfx.wBitsPerSample  = 16;
-	wfx.nBlockAlign     = (WORD)(channels * 2);
-	wfx.nAvgBytesPerSec = sampleRate * channels * 2;
+	if (FAILED(g_pDS->CreateSoundBuffer(&d, &g_pDSBuf, NULL)))
+		{ BgmLog("  FAIL: CreateBuf"); free(pPCM); return false; }
 
-	DSBUFFERDESC dsbd;
-	ZeroMemory(&dsbd, sizeof(dsbd));
-	dsbd.dwSize         = sizeof(dsbd);
-	dsbd.dwFlags        = DSBCAPS_GLOBALFOCUS | DSBCAPS_CTRLVOLUME | DSBCAPS_LOCSOFTWARE;
-	dsbd.dwBufferBytes  = dwPCMSize;
-	dsbd.lpwfxFormat    = &wfx;
-
-	if (FAILED(g_pDS->CreateSoundBuffer(&dsbd, &g_pDSBuf, NULL)))
-	{
-		BgmLog("  FAIL: CreateSoundBuffer(%d bytes)", dwPCMSize);
-		g_pDS->Release(); g_pDS = NULL;
-		free(pPCM); return false;
-	}
-
-	// --- Fill buffer ---
-	void* pLocked;
-	DWORD dwLocked;
-	if (SUCCEEDED(g_pDSBuf->Lock(0, dwPCMSize, &pLocked, &dwLocked, NULL, NULL, 0)))
-	{
-		memcpy(pLocked, pPCM, dwPCMSize);
-		g_pDSBuf->Unlock(pLocked, dwLocked, NULL, 0);
-	}
+	void* pL; DWORD dwL;
+	if (SUCCEEDED(g_pDSBuf->Lock(0, sz, &pL, &dwL, NULL, NULL, 0)))
+		{ memcpy(pL, pPCM, sz); g_pDSBuf->Unlock(pL, dwL, NULL, 0); }
 	free(pPCM);
 
-	// --- Play looping ---
+	g_pDSBuf->SetFrequency(sr);
 	g_pDSBuf->SetCurrentPosition(0);
 	g_pDSBuf->Play(0, 0, DSBPLAY_LOOPING);
 
 	m_bPlaying = true;
-	BgmLog("  SUCCESS: DirectSound looping, %d bytes", dwPCMSize);
+	BgmLog("  SUCCESS: %d bytes @ %dHz", sz, sr);
 	return true;
 }
 
 void CBackgroundMusic::Stop()
 {
-	if (g_pDSBuf)
-	{
-		g_pDSBuf->Stop();
-		g_pDSBuf->Release();
-		g_pDSBuf = NULL;
-	}
-	if (g_pDS)
-	{
-		g_pDS->Release();
-		g_pDS = NULL;
-	}
-	if (m_bPlaying) BgmLog("Stop()");
+	if (g_pDSBuf) { g_pDSBuf->Stop(); g_pDSBuf->Release(); g_pDSBuf = NULL; }
 	m_bPlaying = false;
+}
+
+void CBackgroundMusic::InnerLoopCall()
+{
+	if (!m_bPlaying || !g_pDSBuf) return;
+	if (g_dwRate)
+		g_pDSBuf->SetFrequency(g_dwRate);
 }
 
 CBackgroundMusic g_BackgroundMusic;
