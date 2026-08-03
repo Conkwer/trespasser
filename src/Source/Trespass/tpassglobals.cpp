@@ -5,6 +5,8 @@
 
 #include "..\Lib\Sys\reg.h"
 #include "..\lib\sys\reginit.hpp"
+#include "..\Lib\Audio\BackgroundMusic.hpp"
+#include "..\Lib\Sys\IniFile.hpp"
 #include "resource.h"
 #include "tpassglobals.h"
 #include "rasterdc.hpp"
@@ -299,9 +301,25 @@ int CTPassGlobals::LoadLevel(LPCSTR pszName)
 {
     int     iRet;
     char    szFile[_MAX_PATH];
+    char    szMusic[_MAX_PATH];
 
     // BUGBUG:  Hack to get data drive location
     GetRegString(REG_KEY_DATA_DRIVE, szFile, sizeof(szFile), "");
+
+	// Per-level background music override: data/<level>.ogg
+	g_BackgroundMusic.Stop();
+	if (GetRegValue("EnableBackgroundMusic", 1))
+	{
+		lstrcpy(szMusic, szFile);
+		lstrcat(szMusic, "data\\");
+		lstrcat(szMusic, pszName);
+		lstrcat(szMusic, ".ogg");
+		if (g_BackgroundMusic.Play(szMusic))
+		{
+			SetRegValue(REG_KEY_AUDIO_MUSIC, 0);
+		}
+	}
+
     strcat(szFile, "data\\");
     strcat(szFile, pszName);
 
