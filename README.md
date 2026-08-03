@@ -28,7 +28,8 @@ See [`BUILD.md`](BUILD.md) for the full toolchain setup, build commands, and det
 
 ## Philosophy
 
-DirectX12 and graphic overhauls are not planned. dgVoodoo2 as a wrapper to DirectX12 is recommended instead. You can play on the original legacy hardware, obviously (DirectDraw or DirectX6 compatible video card, Pentium III or better).
+DirectX12 and graphic overhauls are not planned.    
+dgVoodoo2 as a wrapper to DirectX12 is recommended instead. You can play on the original legacy hardware, obviously (DirectDraw or DirectX6 compatible video card, Pentium III or better).
 
 ## Status
 
