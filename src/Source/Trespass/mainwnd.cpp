@@ -641,7 +641,7 @@ void CMainWnd::GameLoop()
 				g_BackgroundMusic.Stop();
 				if (GetRegValue("EnableBackgroundMusic", 1))
 				{
-					static const char* menuExts[] = { ".adx", ".wav", ".cau", ".ogg" };
+					static const char* menuExts[] = { ".adx", ".wav", ".cau" };
 					char szBase[_MAX_PATH];
 					GetRegString(REG_KEY_DATA_DRIVE, szBase, sizeof(szBase), "");
 					for (int me = 0; me < 3; me++)
