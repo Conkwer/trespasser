@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1998
+ * Copyright ï¿½ DreamWorks Interactive. 1998
  *
  * Contents:
  *		Version string.
@@ -23,7 +23,7 @@
 
 #define BUILD_MAJOR     1
 #define BUILD_MINOR     0
-#define BUILD_NUM       116
+#define BUILD_NUM       119
 
 #define STR_BUILD_MAJOR prep_conv_str(BUILD_MAJOR)
 #define STR_BUILD_MINOR prep_conv_str(BUILD_MINOR)
