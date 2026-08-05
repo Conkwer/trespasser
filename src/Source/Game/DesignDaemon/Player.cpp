@@ -42,6 +42,7 @@
 #include "PlayerSettings.hpp"
 
 #include "Game/AI/AIInfo.hpp"
+#include "Gun.hpp"
 #include "Lib/GeomDBase/PartitionPriv.hpp"
 #include "Lib/GeomDBase/RayCast.hpp"
 #include "Lib/GeomDBase/Skeleton.hpp"
@@ -85,6 +86,7 @@
 #pragma optimize("g", off)
 
 int GetDifficulty();
+
 #ifdef __MWERKS__
  // for != if only given ==
  #include <utility>
@@ -1808,6 +1810,13 @@ private:
 		// Set the time to wait before allowing physics drop.
 		sRaiseTime = CMessageStep::sStaticTotal + PlayerSettings.sPickupNoDrop;
 
+		// Hardcore: randomize ammo on pickup.
+		{
+			CGun* pgun = ptCast<CGun>(pins_obj);
+			if (pgun && pgun->iMaxAmmo > 0)
+				pgun->iAmmo = pgun->iMaxAmmo / 4 + (int)(CRandom::randMain() % (uint32)(pgun->iMaxAmmo * 3 / 4));
+		}
+
 		// Do the pickup action for the item.
 		pins_obj->PickedUp();
 
@@ -2087,7 +2096,7 @@ private:
 		}
 
 		// Hardcore: Anne takes extra damage, scaled by attacker revive count.
-		if (GetDifficulty() >= 1 && f_damage > 0.0f)
+		if (GetDifficulty() >= 3 && f_damage > 0.0f)
 		{
 			float fExtra = f_damage * 0.5f;
 			// Additional scaling if attacker is a revived dino.
@@ -2260,7 +2269,7 @@ private:
 	{
 		// Invoke base class message handling.
 		// At difficulty 3, prevent passive HP regen (except in water).
-		if (GetDifficulty() >= 1)
+		if (GetDifficulty() >= 3)
 		{
 			float fSavedRegen = fRegenerationRate;
 			if (IsPlayerInWater())

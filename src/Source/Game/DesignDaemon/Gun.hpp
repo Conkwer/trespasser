@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright ï¿½ DreamWorks Interactive, 1997.
+ * Copyright © DreamWorks Interactive, 1997.
  *
  * Contents:
  *
@@ -135,15 +135,6 @@ public:
 	CMuzzleFlash*	pmuzflMeshes[iMAX_MUZZLE_FLASH];	// A gun can have a maximum of 10 meshes attached to it.
 	CMuzzleFlash*	pmuzflCurrentFlash;
 
-	// Hardcore: weapon respawn tracking.
-	CVector3<>		v3SpawnPos;
-	CInstance*		pinsIdeal;
-	bool			bTaken;
-	TSec			fRespawnTime;
-	bool			bSpawnSet;
-
-	// Override to capture spawn position on first placement.
-	virtual void SetPresence(const CPresence3<>& pr3);
 
 	//*****************************************************************************************
 	//
@@ -207,9 +198,6 @@ public:
 		CValueTable*			pvtable,	// Value Table.
 		CLoadWorld*				pload		// The loader.
 	);
-
-	// Hardcore: process weapon respawn queue.
-	static void ProcessRespawns();
 };
 
 

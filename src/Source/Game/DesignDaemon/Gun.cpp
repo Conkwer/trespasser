@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright ï¿½ DreamWorks Interactive, 1997.
+ * Copyright © DreamWorks Interactive, 1997.
  *
  * Contents:
  *
@@ -61,15 +61,6 @@
 #include "Lib/Std/Random.hpp"
 #include "Lib/Renderer/Particles.hpp"
 
-// Hardcore: global weapon respawn queue.
-struct CGunRespawn {
-	CInstance* pinsIdeal;
-	CVector3<> v3Pos;
-	TSec fRespawnTime;
-};
-static CGunRespawn aRespawns[32];
-static int iRespawnCount = 0;
-
 
 static CRandom rndGun;
 bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
@@ -104,12 +95,6 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 	//*****************************************************************************************
 	CGun::CGun()
 	{
-		v3SpawnPos = CVector3<>(0,0,0);
-		pinsIdeal = 0;
-		bTaken = false;
-		fRespawnTime = 0.0f;
-		bSpawnSet = false;
-
 		// Register this entity with the message types it needs to receive.
 		CMessageStep::RegisterRecipient(this);
 		CMessageMove::RegisterRecipient(this);
@@ -144,11 +129,6 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 			// Clamp ammo.
 			if (iAmmo > iMaxAmmo)
 				iAmmo = iMaxAmmo;
-
-			// Hardcore: randomize ammo (25-150% of max).
-			extern int GetDifficulty();
-			if (GetDifficulty() >= 1 && iMaxAmmo > 0)
-				iAmmo = iMaxAmmo / 4 + (int)(CRandom::randMain() % (uint32)(iMaxAmmo * 3 / 4));
 
 			float fROF = 1.0f;
 			bFILL_FLOAT(fROF, esROF);
@@ -628,18 +608,6 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 	{
 		// The player should say something about how much ammo we have.
 		gpPlayer->TalkAboutAmmoOnPickup(iAmmo, iMaxAmmo, bAltAmmoCount);
-
-		// Hardcore: add to global respawn queue.
-		extern int GetDifficulty();
-		if (GetDifficulty() >= 1 && pinsIdeal != 0 && bSpawnSet && iRespawnCount < 32)
-		{
-			bTaken = true;
-			aRespawns[iRespawnCount].pinsIdeal = pinsIdeal;
-			aRespawns[iRespawnCount].v3Pos = v3SpawnPos;
-			aRespawns[iRespawnCount].fRespawnTime = CMessageStep::sStaticTotal
-				+ 30.0f + (float)(CRandom::randMain() % 90);
-			iRespawnCount++;
-		}
 	}
 
 	//*****************************************************************************************
@@ -665,18 +633,6 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 	
 	extern CProfileStat psMoveMsgGun;
 	
-	//*****************************************************************************************
-	//*****************************************************************************************
-	void CGun::SetPresence(const CPresence3<>& pr3)
-	{
-		CInstance::SetPresence(pr3);
-		if (!bSpawnSet)
-		{
-			v3SpawnPos = pr3.v3Pos;
-			bSpawnSet = true;
-		}
-	}
-
 	//*****************************************************************************************
 	void CGun::Process(const CMessageMove& msg)
 	{
@@ -974,16 +930,12 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 	//*****************************************************************************************
 	CInstance* CGun::pinsCopy() const
 	{
-		CGun *pgun_copy = new CGun();
+		CGun *pgun_copy = new CGun();	
 
 		*pgun_copy = *this;
 
 		// And instance pickup magnets or similar add-ons.
 		pgun_copy->CopyExternalData(this);
-
-		// Hardcore: track ideal for respawn.
-		pgun_copy->pinsIdeal = (CInstance*)this;
-		pgun_copy->bSpawnSet = false;
 
 		return pgun_copy;
 	}
@@ -1119,29 +1071,3 @@ TMuzzleFlashList	CMuzzleFlash::mfMeshList;
 // Global variables.
 //
 CGunData gdGlobalGunData;
-
-//*****************************************************************************************
-void CGun::ProcessRespawns()
-{
-	for (int i = 0; i < iRespawnCount; )
-	{
-		if (CMessageStep::sStaticTotal >= aRespawns[i].fRespawnTime)
-		{
-			CInstance* pinsNew = aRespawns[i].pinsIdeal->pinsCopy();
-			if (pinsNew)
-			{
-				CPresence3<> pr3;
-				pr3.v3Pos = aRespawns[i].v3Pos;
-				pinsNew->SetPresence(pr3);
-				wWorld.Add(pinsNew, true);
-			}
-			// Remove from queue (swap with last).
-			aRespawns[i] = aRespawns[iRespawnCount - 1];
-			iRespawnCount--;
-		}
-		else
-		{
-			i++;
-		}
-	}
-}
