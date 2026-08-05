@@ -1,6 +1,6 @@
 /**********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Contents: The implementation of Animal.hpp.
  *
@@ -309,6 +309,8 @@ public:
 
 		// No one has killed us yet.
 		pinsKiller = 0;
+		iReviveCount = 0;
+		fReviveTime = 0.0f;
 	}
 
 	//*****************************************************************************************

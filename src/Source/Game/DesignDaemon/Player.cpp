@@ -1,6 +1,6 @@
 /**********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Contents: The implementation of Player.hpp.
  *
@@ -60,6 +60,7 @@
 #include "Lib/EntityDBase/WorldDBase.hpp"
 #include "Lib/EntityDBase/Query/QRenderer.hpp"
 #include "Lib/EntityDBase/Query/QPhysics.hpp"
+#include "Lib/EntityDBase/Query/QWater.hpp"
 #include "Lib/Loader/SaveFile.hpp"
 #include "Lib/Control/Control.hpp"
 #include "Lib/Physics/InfoPlayer.hpp"
@@ -82,6 +83,8 @@
 
 // PREVENT CODE GEN BUG!
 #pragma optimize("g", off)
+
+int GetDifficulty();
 
 #ifdef __MWERKS__
  // for != if only given ==
@@ -444,29 +447,29 @@ namespace
 		// If we parameterise the rotation by the C element of the quaternion (t), then the
 		// rotation is:
 		//
-		//		R = (t, sqrt(1 - t²)A)
+		//		R = (t, sqrt(1 - tï¿½)A)
 		//
 		// We wish to minimise the product of r3_move (Q) and R.  This is done by maximising
 		// the absolute value of the product's C element.  By quaternion multiplication, this is:
 		//
 		//		C = Q.c R.c - Q.S R.S
-		//		  = Q.c t - Q.S A sqrt(1-t²)
-		//		  = X t - Y sqrt(1-t²)				(X == Q.c,  Y == Q.S A)
+		//		  = Q.c t - Q.S A sqrt(1-tï¿½)
+		//		  = X t - Y sqrt(1-tï¿½)				(X == Q.c,  Y == Q.S A)
 		//
-		//		dC/dt = 0 = X - Y (-2t) / (2 sqrt(1-t²))
-		//				  = X + Y t / sqrt(1-t²)
-		//		Y t/sqrt(1-t²) = -X
-		//		Y² t²/(1-t²) = X²
-		//		t²/(1-t²) = X²/Y²
-		//		t² = X²/Y² (1-t²)
-		//		(1 + X²/Y²)t² = X²/Y²
-		//		t² = X²/Y² / (1 + X²/Y²)
-		//		t² = X²/(X² + Y²)
-		//		t = ± X / sqrt(X² + Y²)
+		//		dC/dt = 0 = X - Y (-2t) / (2 sqrt(1-tï¿½))
+		//				  = X + Y t / sqrt(1-tï¿½)
+		//		Y t/sqrt(1-tï¿½) = -X
+		//		Yï¿½ tï¿½/(1-tï¿½) = Xï¿½
+		//		tï¿½/(1-tï¿½) = Xï¿½/Yï¿½
+		//		tï¿½ = Xï¿½/Yï¿½ (1-tï¿½)
+		//		(1 + Xï¿½/Yï¿½)tï¿½ = Xï¿½/Yï¿½
+		//		tï¿½ = Xï¿½/Yï¿½ / (1 + Xï¿½/Yï¿½)
+		//		tï¿½ = Xï¿½/(Xï¿½ + Yï¿½)
+		//		t = ï¿½ X / sqrt(Xï¿½ + Yï¿½)
 		//
 		//	To find which sign of t yields the true maximum absolute value of C, examine C again:
 		//
-		//		C = X t - Y sqrt(1-t²)
+		//		C = X t - Y sqrt(1-tï¿½)
 		//
 		//	X t should be the same sign as -Y, thus we want X Y t < 0.
 		//		
@@ -2083,6 +2086,20 @@ private:
 		{
 			Say(sndhnd);
 		}
+
+		// Hardcore: Anne takes extra damage, scaled by attacker revive count.
+		if (GetDifficulty() >= 3 && f_damage > 0.0f)
+		{
+			float fExtra = f_damage * 0.5f;
+			// Additional scaling if attacker is a revived dino.
+			if (pins_aggressor)
+			{
+				CBoundaryBox* pbb = ptCast<CBoundaryBox>((CInstance*)pins_aggressor);
+				if (pbb && pbb->paniAnimate && pbb->paniAnimate->iReviveCount > 0)
+					fExtra += f_damage * pbb->paniAnimate->iReviveCount * 0.5f;
+			}
+			fHitPoints -= fExtra;
+		}
 	}
 
 	//*****************************************************************************************
@@ -2243,7 +2260,27 @@ private:
 	virtual void Process(const CMessageStep& msgstep)
 	{
 		// Invoke base class message handling.
-		CAnimate::Process(msgstep);
+		// At difficulty 3, prevent passive HP regen (except in water).
+		if (GetDifficulty() >= 3)
+		{
+			float fSavedRegen = fRegenerationRate;
+			if (IsPlayerInWater())
+			{
+				// Fast heal in water (20 HP/sec).
+				fRegenerationRate = 20.0f;
+			}
+			else
+			{
+				// No passive regen outside water.
+				fRegenerationRate = 0.0f;
+			}
+			CAnimate::Process(msgstep);
+			fRegenerationRate = fSavedRegen;
+		}
+		else
+		{
+			CAnimate::Process(msgstep);
+		}
 
 		// Show animated texture health meter.
 		if (prdtGetRenderInfo())
@@ -3412,7 +3449,19 @@ private:
 		SetFlagHardwareAble(true);
 		CPartition::InitializeDataStatic();
 	}
+
+	bool IsPlayerInWater() const;
 };
+
+//*****************************************************************************************
+bool CPlayerPriv::IsPlayerInWater() const
+{
+	const CVector3<>& v3 = v3Pos();
+	CWDbQueryWaterHeight qwr(CVector2<>(v3.tX, v3.tY));
+	// v3Pos returns center-of-body; water surface is near feet level.
+	// Offset check so standing in water is reliably detected.
+	return qwr.petWater != 0 && v3.tZ < qwr.v3Water.tZ + 0.8f;
+}
 
 //******************************************************************************************
 //
@@ -3603,7 +3652,7 @@ private:
 		//	Squaring both sides, expanding the vector equation to 3 scalar equations,
 		//	summing them, and rearranging, we have the quadratic equation
 		//
-		//		H² r² - 2 (H*S) r + S² - d² = 0
+		//		Hï¿½ rï¿½ - 2 (H*S) r + Sï¿½ - dï¿½ = 0
 		//
 
 		// Hand pos starts out as unit vector in desired direction.

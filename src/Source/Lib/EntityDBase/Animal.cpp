@@ -1,6 +1,6 @@
 /**********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Contents: The implementation of Animal.hpp.
  *
@@ -30,6 +30,7 @@
 
 #include "Common.hpp"
 #include "Animal.hpp"
+#include "Game/AI/AIMain.hpp"
 
 #include "Lib/EntityDBase/MessageLog.hpp"
 #include "Game/AI/Brain.hpp"
@@ -55,6 +56,8 @@ extern CProfileStat psCollisionMsgBrain;
 //
 // CAnimal implementation.
 //
+
+int GetDifficulty();
 	
 	//******************************************************************************************
 	CAnimal::CAnimal()
@@ -202,6 +205,66 @@ extern CProfileStat psCollisionMsgBrain;
 	{
 		Assert(pbrBrain);
 		pbrBrain->HandleMessage(msgdeath);
+
+		// Hardcore: only process for the animal that actually died.
+		if (GetDifficulty() >= 3 && msgdeath.paniDyingThing == this)
+		{
+			TSec sNow = gaiSystem.sNow;
+			if (iReviveCount == 0)
+				fReviveTime = sNow + 10.0f;
+			else if (iReviveCount == 1)
+				fReviveTime = sNow + 15.0f;
+			else
+				fReviveTime = sNow + 20.0f;
+			iReviveCount++;
+
+			// Instantly kill to skip death struggle animation.
+			fHitPoints = fReallyDead;
+			fDieRate = 1.0f;
+
+			// Heal Anne for the kill.
+			if (gpPlayer && !gpPlayer->bDead())
+			{
+				gpPlayer->fHitPoints += 20.0f;
+				if (gpPlayer->fHitPoints > gpPlayer->fMaxHitPoints)
+					gpPlayer->fHitPoints = gpPlayer->fMaxHitPoints;
+			}
+		}
+	}
+
+	//******************************************************************************************
+	void CAnimal::Process(const CMessageStep& msgstep)
+	{
+		CAnimate::Process(msgstep);
+
+		if (GetDifficulty() < 3)
+			return;
+
+		if (bDead() && fReviveTime > 0.0f && msgstep.sTotal >= fReviveTime)
+		{
+			fHitPoints = fMaxHitPoints * 0.5f;
+			fReviveTime = 0.0f;
+			pinsKiller = NULL;
+
+			// Reset placement rotation to upright before rebuilding physics.
+			{
+				CVector3<> v3 = v3Pos();
+				CPlacement3<> p3_upright(v3);
+				Move(p3_upright);
+			}
+
+			// Rebuild physics skeleton to standing pose.
+			if (pphiGetPhysicsInfo())
+			{
+				pphiGetPhysicsInfo()->Deactivate(this);
+				pphiGetPhysicsInfo()->Activate(this);
+			}
+
+			if (pbrBrain)
+				pbrBrain->SetMaxAggression();
+
+			gaiSystem.ActivateAnimal(this);
+		}
 	}
 
 	//******************************************************************************************
@@ -209,6 +272,17 @@ extern CProfileStat psCollisionMsgBrain;
 	{
 		if (bDead())
 			return;
+
+		// Hardcore: revived dinos deal extra damage.
+		if (GetDifficulty() >= 3 && f_damage > 0.0f && pins_aggressor)
+		{
+			CBoundaryBox* pbb = ptCast<CBoundaryBox>((CInstance*)pins_aggressor);
+			if (pbb && pbb->paniAnimate && pbb->paniAnimate->iReviveCount > 0)
+			{
+				float fScale = 1.0f + pbb->paniAnimate->iReviveCount * 0.5f;
+				fHitPoints -= f_damage * (fScale - 1.0f);
+			}
+		}
 
 		Assert(pbrBrain);
 		pbrBrain->HandleDamage(f_damage, pins_aggressor);

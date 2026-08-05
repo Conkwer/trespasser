@@ -244,6 +244,12 @@ public:
 		const CMessageDeath& msgdeath
 	);
 
+	//******************************************************************************************
+	virtual void Process
+	(
+		const CMessageStep& msgstep
+	);
+
 	//*****************************************************************************************
 	virtual void HandleDamage
 	(

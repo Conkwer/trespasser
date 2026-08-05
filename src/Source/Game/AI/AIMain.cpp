@@ -1,6 +1,6 @@
 /**********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  *	Implementation of AIMain.hpp.
  *
@@ -195,6 +195,8 @@ float fAIDebug3 = 0.5;
 //
 //	Class CAISystem implementation.
 //
+
+int GetDifficulty();
 
 	//*********************************************************************************************
 	//
@@ -797,8 +799,9 @@ float fAIDebug3 = 0.5;
 
 		AlwaysAssert(sLastExecution <= sNow);
 
-		// Cap the AI frame rate.
-		if (sNow > sLastExecution + sMinInterval)
+		// Cap the AI frame rate (faster at extreme difficulty).
+		TSec sInterval = (GetDifficulty() >= 3) ? sMinInterval * 0.5f : sMinInterval;
+		if (sNow > sLastExecution + sInterval)
 		{
 			// Flag the AI as having a process step message pending.
 			bStepPending = true;
@@ -828,7 +831,7 @@ float fAIDebug3 = 0.5;
 			CAnimal* pani = (CAnimal*) *ipani;
 
 			// Multiplier for more wakeable dinos.
-			float f_mul = 1.0f;
+			float f_mul = (GetDifficulty() >= 3) ? 2.0f : 1.0f;
 
 			if (!bSleep &&
 				!bBoring &&
@@ -848,8 +851,8 @@ float fAIDebug3 = 0.5;
 		{
 			CAnimal* pani = (CAnimal*) *ipani;
 
-			// Multiplier for more wakeable dinos.
-			float f_mul = 1.0f;
+			// Multiplier for more wakeable dinos (boosted at extreme).
+			float f_mul = (GetDifficulty() >= 3) ? 2.0f : 1.0f;
 
 			if (!bSleep &&
 				!bBoring &&

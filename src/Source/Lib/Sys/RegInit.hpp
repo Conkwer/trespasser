@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive, 1997.
+ * Copyright ï¿½ DreamWorks Interactive, 1997.
  *
  * Implementation of RegInit.hpp.
  *
@@ -106,6 +106,7 @@
 #define REG_KEY_KEYMAP              "KeyMap"
 #define REG_KEY_GORE                "Gore"
 #define REG_KEY_INVERTMOUSE         "InvertMouse"
+#define REG_KEY_DIFFICULTY          "Difficulty"
 
 // Registry entries for error handling.
 #define REG_KEY_AUTOSAVE            "Auto Save"
@@ -127,6 +128,7 @@
 #define DEFAULT_GAMMA               5
 #define DEFAULT_GORE                1
 #define DEFAULT_INVERTMOUSE         FALSE
+#define DEFAULT_DIFFICULTY          0
 #define DEFAULT_VIEWPORT_X          0
 #define DEFAULT_VIEWPORT_Y          0
 

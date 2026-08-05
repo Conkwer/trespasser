@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Contents:
  *		CBrain class for AI library.  CBrain handles all processing and data
@@ -954,6 +954,12 @@ public:
 		void HandleDamage(float f_damage, const CInstance* pins_aggressor = 0);
 		//
 		//	Updates brain for taking hit points of damage.
+		//
+		//********************************
+
+		void SetMaxAggression();
+		//
+		//	Sets emotions for max aggression (hardcore revive).
 		//
 		//********************************
 

@@ -2,6 +2,7 @@
 
 void  OpenKey ();
 void  CloseKey(BOOL b_change_safemode = TRUE);
+int   GetDifficulty();
 void  DeleteValue(LPCSTR lpszVal);
 void  SetRegValue (LPCSTR lpszVal, int nVal);
 int   GetRegValue (LPCSTR lpszVal, int nDefault);

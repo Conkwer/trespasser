@@ -1,6 +1,6 @@
 /**********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Contents:
  *		CAnimate
@@ -225,6 +225,9 @@ public:
 	int iNumWounds;						// This should be part of a CMArray, but the MS compiler team has shit for brains.
 
 	CInstance*	pinsKiller;		// The instance that killed me, zero if none.
+
+	int iReviveCount;			// Number of times revived (0 = never died).
+	float fReviveTime;			// Sim-time to revive (CMessageStep::sTotal), 0 = no timer.
 
 	static int iGoreLevel;			// Controls how much animates bleed.
 									// 0 = Tipper Gore level.

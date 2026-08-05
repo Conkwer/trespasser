@@ -1,6 +1,6 @@
 /**********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  *	Implementation of Brain.hpp.
  *
@@ -244,6 +244,8 @@
 #include "Test/AI/AITest.hpp"
 #include "Test/Ai/airesource.h"
 #endif
+
+int GetDifficulty();
 
 CProfileStat psSynthesizer("Synthesizer", &proProfile.psAI);
 CProfileStat psAnalyzer("Analyzer", &proProfile.psAI);
@@ -1525,6 +1527,10 @@ extern int iAnimalVersion;
 
 			CFeeling feel_damage_reaction = feelDamageFeeling * (f_damage / paniOwner->fMaxHitPoints);
 
+			// Hardcore: damage also causes anger, not just pain.
+			if (GetDifficulty() >= 3)
+				feel_damage_reaction[eptANGER] = 3.0f * (f_damage / paniOwner->fMaxHitPoints);
+
 			pmsState->feelEmotions = pmsState->feelEmotions + feel_damage_reaction;
 
 			if (pins_aggressor)
@@ -1550,6 +1556,15 @@ extern int iAnimalVersion;
 
 			// Activate the guy.
 			gaiSystem.ActivateAnimal(paniOwner);
+		}
+
+		//****************************************************************************************
+		void CBrain::SetMaxAggression()
+		{
+			pmsState->feelEmotions[eptANGER] = 10.0f;
+			pmsState->feelEmotions[eptFEAR]  = 0.0f;
+			pmsState->feelEmotions[eptPAIN]  = 0.0f;
+			pmsState->feelDefault[eptANGER]  = 5.0f;
 		}
 
 		//****************************************************************************************

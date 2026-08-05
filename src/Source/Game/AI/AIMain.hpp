@@ -1,7 +1,7 @@
 /***********************************************************************************************
  *
  * $Source::																				   $
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Contents:
  *		The AI main functions.
@@ -79,7 +79,7 @@
 #include "Lib/Sys/FastHeap.hpp"
 
 #define iAI_RANDOM_SEED 87;
-#define iMAX_ACTIVE_ANIMALS 4
+#define iMAX_ACTIVE_ANIMALS 8
 #define iNUM_VOCALS 10
 //(edtEND * evtEND * 10)
 

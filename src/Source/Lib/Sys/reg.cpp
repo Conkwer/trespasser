@@ -90,6 +90,7 @@ static void WriteDefaults()
 	// Gameplay
 	SetRegValue(REG_KEY_GORE,                 3);
 	SetRegValue(REG_KEY_INVERTMOUSE,          0);
+	SetRegValue(REG_KEY_DIFFICULTY,           DEFAULT_DIFFICULTY);
 	SetRegValue(REG_KEY_VIEWPORT_X,           0);
 	SetRegValue(REG_KEY_VIEWPORT_Y,           0);
 
@@ -130,6 +131,11 @@ void CloseKey(BOOL b_change_safemode)
 
 	// Flush INI to disk
 	WritePrivateProfileString(NULL, NULL, NULL, g_szConfigPath);
+}
+
+int GetDifficulty()
+{
+	return GetRegValue(REG_KEY_DIFFICULTY, DEFAULT_DIFFICULTY);
 }
 
 // --- Integer values ---
