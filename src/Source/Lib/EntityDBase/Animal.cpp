@@ -207,7 +207,7 @@ int GetDifficulty();
 		pbrBrain->HandleMessage(msgdeath);
 
 		// Hardcore: only process for the animal that actually died.
-		if (GetDifficulty() >= 3 && msgdeath.paniDyingThing == this)
+		if (GetDifficulty() >= 1 && msgdeath.paniDyingThing == this)
 		{
 			TSec sNow = gaiSystem.sNow;
 			if (iReviveCount == 0)
@@ -237,7 +237,7 @@ int GetDifficulty();
 	{
 		CAnimate::Process(msgstep);
 
-		if (GetDifficulty() < 3)
+		if (GetDifficulty() < 1)
 			return;
 
 		if (bDead() && fReviveTime > 0.0f && msgstep.sTotal >= fReviveTime)
@@ -274,7 +274,7 @@ int GetDifficulty();
 			return;
 
 		// Hardcore: revived dinos deal extra damage.
-		if (GetDifficulty() >= 3 && f_damage > 0.0f && pins_aggressor)
+		if (GetDifficulty() >= 1 && f_damage > 0.0f && pins_aggressor)
 		{
 			CBoundaryBox* pbb = ptCast<CBoundaryBox>((CInstance*)pins_aggressor);
 			if (pbb && pbb->paniAnimate && pbb->paniAnimate->iReviveCount > 0)

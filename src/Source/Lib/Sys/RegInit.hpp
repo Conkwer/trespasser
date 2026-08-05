@@ -107,6 +107,7 @@
 #define REG_KEY_GORE                "Gore"
 #define REG_KEY_INVERTMOUSE         "InvertMouse"
 #define REG_KEY_DIFFICULTY          "Difficulty"
+#define REG_KEY_PERMADEATH          "Permadeath"
 
 // Registry entries for error handling.
 #define REG_KEY_AUTOSAVE            "Auto Save"
@@ -129,6 +130,7 @@
 #define DEFAULT_GORE                1
 #define DEFAULT_INVERTMOUSE         FALSE
 #define DEFAULT_DIFFICULTY          0
+#define DEFAULT_PERMADEATH          0
 #define DEFAULT_VIEWPORT_X          0
 #define DEFAULT_VIEWPORT_Y          0
 

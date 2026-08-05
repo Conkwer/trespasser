@@ -1528,7 +1528,7 @@ extern int iAnimalVersion;
 			CFeeling feel_damage_reaction = feelDamageFeeling * (f_damage / paniOwner->fMaxHitPoints);
 
 			// Hardcore: damage also causes anger, not just pain.
-			if (GetDifficulty() >= 3)
+			if (GetDifficulty() >= 1)
 				feel_damage_reaction[eptANGER] = 3.0f * (f_damage / paniOwner->fMaxHitPoints);
 
 			pmsState->feelEmotions = pmsState->feelEmotions + feel_damage_reaction;

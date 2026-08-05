@@ -800,7 +800,7 @@ int GetDifficulty();
 		AlwaysAssert(sLastExecution <= sNow);
 
 		// Cap the AI frame rate (faster at extreme difficulty).
-		TSec sInterval = (GetDifficulty() >= 3) ? sMinInterval * 0.5f : sMinInterval;
+		TSec sInterval = (GetDifficulty() >= 1) ? sMinInterval * 0.5f : sMinInterval;
 		if (sNow > sLastExecution + sInterval)
 		{
 			// Flag the AI as having a process step message pending.
@@ -831,7 +831,7 @@ int GetDifficulty();
 			CAnimal* pani = (CAnimal*) *ipani;
 
 			// Multiplier for more wakeable dinos.
-			float f_mul = (GetDifficulty() >= 3) ? 2.0f : 1.0f;
+			float f_mul = (GetDifficulty() >= 1) ? 3.0f : 1.0f;
 
 			if (!bSleep &&
 				!bBoring &&
@@ -852,7 +852,7 @@ int GetDifficulty();
 			CAnimal* pani = (CAnimal*) *ipani;
 
 			// Multiplier for more wakeable dinos (boosted at extreme).
-			float f_mul = (GetDifficulty() >= 3) ? 2.0f : 1.0f;
+			float f_mul = (GetDifficulty() >= 1) ? 3.0f : 1.0f;
 
 			if (!bSleep &&
 				!bBoring &&

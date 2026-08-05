@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive, 1997.
+ * Copyright ï¿½ DreamWorks Interactive, 1997.
  *
  * Contents:
  *
@@ -95,6 +95,12 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 	//*****************************************************************************************
 	CGun::CGun()
 	{
+		v3SpawnPos = CVector3<>(0,0,0);
+		pinsIdeal = 0;
+		bTaken = false;
+		fRespawnTime = 0.0f;
+		bSpawnSet = false;
+
 		// Register this entity with the message types it needs to receive.
 		CMessageStep::RegisterRecipient(this);
 		CMessageMove::RegisterRecipient(this);
@@ -608,6 +614,15 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 	{
 		// The player should say something about how much ammo we have.
 		gpPlayer->TalkAboutAmmoOnPickup(iAmmo, iMaxAmmo, bAltAmmoCount);
+
+		// Hardcore: start respawn timer (30-120s random).
+		extern int GetDifficulty();
+		if (GetDifficulty() >= 1 && pinsIdeal != 0)
+		{
+			bTaken = true;
+			fRespawnTime = CMessageStep::sStaticTotal + 30.0f +
+				(float)(rand() % 90);
+		}
 	}
 
 	//*****************************************************************************************
@@ -627,6 +642,32 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 			}
 		}
 
+		// Hardcore: weapon respawn.
+		extern int GetDifficulty();
+		if (GetDifficulty() >= 1 && bTaken && fRespawnTime > 0.0f &&
+			CMessageStep::sStaticTotal >= fRespawnTime && pinsIdeal)
+		{
+			CInstance* pinsNew = pinsIdeal->pinsCopy();
+			if (pinsNew)
+			{
+				CPresence3<> pr3;
+				pr3.v3Pos = v3SpawnPos;
+				pinsNew->SetPresence(pr3);
+				wWorld.Add(pinsNew, true);
+
+				// The new copy inherits our spawn tracking.
+				CGun* pgunNew = ptCast<CGun>(pinsNew);
+				if (pgunNew)
+				{
+					pgunNew->v3SpawnPos = v3SpawnPos;
+					pgunNew->bTaken = false;
+					pgunNew->fRespawnTime = 0.0f;
+					pgunNew->bSpawnSet = true;
+				}
+			}
+			fRespawnTime = 0.0f;
+		}
+
 		CHitSpang::ProcessStep(msg);
 	}
 
@@ -637,6 +678,13 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 	void CGun::Process(const CMessageMove& msg)
 	{
 		CTimeBlock tmb(&psMoveMsgGun);
+
+		// Hardcore: capture spawn position on first placement.
+		if (!bSpawnSet && msg.etType == CMessageMove::etMOVED)
+		{
+			v3SpawnPos = pr3GetPresence().v3Pos;
+			bSpawnSet = true;
+		}
 
 		// Has some other system moved then gun?? Like the physics??
 		// If so we must move the muzzle flash if it is present
@@ -930,12 +978,16 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 	//*****************************************************************************************
 	CInstance* CGun::pinsCopy() const
 	{
-		CGun *pgun_copy = new CGun();	
+		CGun *pgun_copy = new CGun();
 
 		*pgun_copy = *this;
 
 		// And instance pickup magnets or similar add-ons.
 		pgun_copy->CopyExternalData(this);
+
+		// Hardcore: track ideal for respawn.
+		pgun_copy->pinsIdeal = (CInstance*)this;
+		pgun_copy->bSpawnSet = false;
 
 		return pgun_copy;
 	}
