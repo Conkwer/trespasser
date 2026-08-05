@@ -204,6 +204,9 @@ public:
 		CValueTable*			pvtable,	// Value Table.
 		CLoadWorld*				pload		// The loader.
 	);
+
+	// Hardcore: process weapon respawn queue.
+	static void ProcessRespawns();
 };
 
 

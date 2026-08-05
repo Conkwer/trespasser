@@ -61,6 +61,15 @@
 #include "Lib/Std/Random.hpp"
 #include "Lib/Renderer/Particles.hpp"
 
+// Hardcore: global weapon respawn queue.
+struct CGunRespawn {
+	CInstance* pinsIdeal;
+	CVector3<> v3Pos;
+	TSec fRespawnTime;
+};
+static CGunRespawn aRespawns[32];
+static int iRespawnCount = 0;
+
 
 static CRandom rndGun;
 bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
@@ -615,13 +624,16 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 		// The player should say something about how much ammo we have.
 		gpPlayer->TalkAboutAmmoOnPickup(iAmmo, iMaxAmmo, bAltAmmoCount);
 
-		// Hardcore: start respawn timer (30-120s random).
+		// Hardcore: add to global respawn queue.
 		extern int GetDifficulty();
-		if (GetDifficulty() >= 1 && pinsIdeal != 0)
+		if (GetDifficulty() >= 1 && pinsIdeal != 0 && bSpawnSet && iRespawnCount < 32)
 		{
 			bTaken = true;
-			fRespawnTime = CMessageStep::sStaticTotal + 30.0f +
-				(float)(rand() % 90);
+			aRespawns[iRespawnCount].pinsIdeal = pinsIdeal;
+			aRespawns[iRespawnCount].v3Pos = v3SpawnPos;
+			aRespawns[iRespawnCount].fRespawnTime = CMessageStep::sStaticTotal
+				+ 30.0f + (float)(CRandom::randMain() % 90);
+			iRespawnCount++;
 		}
 	}
 
@@ -640,32 +652,6 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 				wWorld.Remove(pmuzflCurrentFlash);
 				pmuzflCurrentFlash = NULL;
 			}
-		}
-
-		// Hardcore: weapon respawn.
-		extern int GetDifficulty();
-		if (GetDifficulty() >= 1 && bTaken && fRespawnTime > 0.0f &&
-			CMessageStep::sStaticTotal >= fRespawnTime && pinsIdeal)
-		{
-			CInstance* pinsNew = pinsIdeal->pinsCopy();
-			if (pinsNew)
-			{
-				CPresence3<> pr3;
-				pr3.v3Pos = v3SpawnPos;
-				pinsNew->SetPresence(pr3);
-				wWorld.Add(pinsNew, true);
-
-				// The new copy inherits our spawn tracking.
-				CGun* pgunNew = ptCast<CGun>(pinsNew);
-				if (pgunNew)
-				{
-					pgunNew->v3SpawnPos = v3SpawnPos;
-					pgunNew->bTaken = false;
-					pgunNew->fRespawnTime = 0.0f;
-					pgunNew->bSpawnSet = true;
-				}
-			}
-			fRespawnTime = 0.0f;
 		}
 
 		CHitSpang::ProcessStep(msg);
@@ -1123,3 +1109,29 @@ TMuzzleFlashList	CMuzzleFlash::mfMeshList;
 // Global variables.
 //
 CGunData gdGlobalGunData;
+
+//*****************************************************************************************
+void CGun::ProcessRespawns()
+{
+	for (int i = 0; i < iRespawnCount; )
+	{
+		if (CMessageStep::sStaticTotal >= aRespawns[i].fRespawnTime)
+		{
+			CInstance* pinsNew = aRespawns[i].pinsIdeal->pinsCopy();
+			if (pinsNew)
+			{
+				CPresence3<> pr3;
+				pr3.v3Pos = aRespawns[i].v3Pos;
+				pinsNew->SetPresence(pr3);
+				wWorld.Add(pinsNew, true);
+			}
+			// Remove from queue (swap with last).
+			aRespawns[i] = aRespawns[iRespawnCount - 1];
+			iRespawnCount--;
+		}
+		else
+		{
+			i++;
+		}
+	}
+}
