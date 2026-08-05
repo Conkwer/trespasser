@@ -142,6 +142,9 @@ public:
 	TSec			fRespawnTime;
 	bool			bSpawnSet;
 
+	// Override to capture spawn position on first placement.
+	virtual void SetPresence(const CPresence3<>& pr3);
+
 	//*****************************************************************************************
 	//
 	// Constructors.

@@ -145,6 +145,11 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 			if (iAmmo > iMaxAmmo)
 				iAmmo = iMaxAmmo;
 
+			// Hardcore: randomize ammo (25-150% of max).
+			extern int GetDifficulty();
+			if (GetDifficulty() >= 1 && iMaxAmmo > 0)
+				iAmmo = iMaxAmmo / 4 + (int)(CRandom::randMain() % (uint32)(iMaxAmmo * 3 / 4));
+
 			float fROF = 1.0f;
 			bFILL_FLOAT(fROF, esROF);
 			Assert(fROF > 0.01f);
@@ -661,16 +666,21 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 	extern CProfileStat psMoveMsgGun;
 	
 	//*****************************************************************************************
+	//*****************************************************************************************
+	void CGun::SetPresence(const CPresence3<>& pr3)
+	{
+		CInstance::SetPresence(pr3);
+		if (!bSpawnSet)
+		{
+			v3SpawnPos = pr3.v3Pos;
+			bSpawnSet = true;
+		}
+	}
+
+	//*****************************************************************************************
 	void CGun::Process(const CMessageMove& msg)
 	{
 		CTimeBlock tmb(&psMoveMsgGun);
-
-		// Hardcore: capture spawn position on first placement.
-		if (!bSpawnSet && msg.etType == CMessageMove::etMOVED)
-		{
-			v3SpawnPos = pr3GetPresence().v3Pos;
-			bSpawnSet = true;
-		}
 
 		// Has some other system moved then gun?? Like the physics??
 		// If so we must move the muzzle flash if it is present
