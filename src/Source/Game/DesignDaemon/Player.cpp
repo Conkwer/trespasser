@@ -1810,11 +1810,14 @@ private:
 		// Set the time to wait before allowing physics drop.
 		sRaiseTime = CMessageStep::sStaticTotal + PlayerSettings.sPickupNoDrop;
 
-		// Hardcore: randomize ammo on pickup.
+		// Hardcore: randomize ammo on first pickup only.
 		{
 			CGun* pgun = ptCast<CGun>(pins_obj);
-			if (pgun && pgun->iMaxAmmo > 0)
+			if (pgun && !pgun->bAmmoRandomized && pgun->iMaxAmmo > 0)
+			{
 				pgun->iAmmo = pgun->iMaxAmmo / 4 + (int)(CRandom::randMain() % (uint32)(pgun->iMaxAmmo * 3 / 4));
+				pgun->bAmmoRandomized = true;
+			}
 		}
 
 		// Do the pickup action for the item.

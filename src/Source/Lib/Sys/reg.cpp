@@ -91,7 +91,6 @@ static void WriteDefaults()
 	SetRegValue(REG_KEY_GORE,                 3);
 	SetRegValue(REG_KEY_INVERTMOUSE,          0);
 	SetRegValue(REG_KEY_DIFFICULTY,           DEFAULT_DIFFICULTY);
-	SetRegValue(REG_KEY_PERMADEATH,           DEFAULT_PERMADEATH);
 	SetRegValue(REG_KEY_VIEWPORT_X,           0);
 	SetRegValue(REG_KEY_VIEWPORT_Y,           0);
 

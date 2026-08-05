@@ -95,6 +95,8 @@ bool    g_bUnlimitedAmmo = FALSE; //cheat can toggle this
 	//*****************************************************************************************
 	CGun::CGun()
 	{
+		bAmmoRandomized = false;
+
 		// Register this entity with the message types it needs to receive.
 		CMessageStep::RegisterRecipient(this);
 		CMessageMove::RegisterRecipient(this);

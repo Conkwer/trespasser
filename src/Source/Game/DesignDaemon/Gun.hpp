@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive, 1997.
+ * Copyright ï¿½ DreamWorks Interactive, 1997.
  *
  * Contents:
  *
@@ -135,6 +135,7 @@ public:
 	CMuzzleFlash*	pmuzflMeshes[iMAX_MUZZLE_FLASH];	// A gun can have a maximum of 10 meshes attached to it.
 	CMuzzleFlash*	pmuzflCurrentFlash;
 
+	bool			bAmmoRandomized;
 
 	//*****************************************************************************************
 	//
