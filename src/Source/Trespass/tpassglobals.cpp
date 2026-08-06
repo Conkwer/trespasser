@@ -14,6 +14,10 @@
 #include "uiwnd.h"
 #include "uidlgs.h"
 #include "main.h"
+#include "..\Lib\EntityDBase\Animal.hpp"
+#include "..\Lib\EntityDBase\PhysicsInfo.hpp"
+#include "..\Game\AI\AIMain.hpp"
+#include "..\Game\AI\Brain.hpp"
 
 
 extern HINSTANCE    g_hInst;
@@ -22,6 +26,7 @@ extern CMainWnd *   g_pMainWnd;
 
 CTPassGlobals               g_CTPassGlobals;
 char                        g_szCurrentLevelBase[_MAX_PATH] = "";
+static uint32               g_u4RandSeed = 0;
 PFNWORLDLOADNOTIFY          g_pfnWorldLoadNotify;
 uint32                      g_u4NotifyParam;
 const float                 g_fMaxPower = 3.0f;
@@ -298,6 +303,127 @@ void CTPassGlobals::DarkenBackground()
 
 
 // Load as scene, adding the data directory to the path.
+// Parse %level%.loc and relocate matching animals after level load.
+// Format: TypeName X Y Z — matches instance names starting with TypeName.
+// Find an animal (active or inactive) whose instance name starts with pszPrefix.
+static CAnimal* paniFindByName(const char* pszPrefix, int iPrefixLen)
+{
+	// Check active animals first
+	for (int a = 0; a < iMAX_ACTIVE_ANIMALS; a++)
+	{
+		CAnimal* pani = gaiSystem.apaniActiveAnimals[a];
+		if (!pani || pani->bDead()) continue;
+		const char* pszName = pani->strGetInstanceName();
+		if (pszName && memcmp(pszName, pszPrefix, iPrefixLen) == 0)
+			return pani;
+	}
+	// Check inactive animals
+	for (list<void*>::iterator it = gaiSystem.lpaniInactiveAnimals.begin();
+	     it != gaiSystem.lpaniInactiveAnimals.end(); ++it)
+	{
+		CAnimal* pani = (CAnimal*)(*it);
+		if (!pani || pani->bDead()) continue;
+		const char* pszName = pani->strGetInstanceName();
+		if (pszName && memcmp(pszName, pszPrefix, iPrefixLen) == 0)
+			return pani;
+	}
+	return 0;
+}
+
+// Relocate an animal to a new position with physics rebuild.
+static void RelocateAnimal(CAnimal* pani, float x, float y, float z)
+{
+	CVector3<> v3New(x, y, z);
+	CPlacement3<> p3_upright(v3New);
+	pani->Move(p3_upright);
+	if (pani->pphiGetPhysicsInfo())
+	{
+		pani->pphiGetPhysicsInfo()->Deactivate(pani);
+		pani->pphiGetPhysicsInfo()->Activate(pani);
+	}
+	// Go aggressive at new location (overrides "go home" wandering)
+	if (pani->pbrBrain)
+		pani->pbrBrain->SetMaxAggression();
+
+	// ~30% chance: alpha raptor (tougher, hits harder)
+	g_u4RandSeed = g_u4RandSeed * 1664525 + 1013904223;
+	if ((g_u4RandSeed % 100) < 30)
+	{
+		pani->fMaxHitPoints *= 1.5f;
+		pani->fHitPoints = pani->fMaxHitPoints;
+		pani->iReviveCount = 3;  // 3x damage to Anne, 2.5x dino-vs-dino
+	}
+}
+
+// Parse a coordinate value, stripping commas.
+static bool bParseCoord(const char*& p, float& f)
+{
+	while (*p == ' ' || *p == '\t' || *p == ',') p++;
+	if (!*p || *p == '\r' || *p == '\n') return false;
+	f = (float)atof(p);
+	while (*p && *p != ' ' && *p != '\t' && *p != ',' && *p != '\r' && *p != '\n') p++;
+	return true;
+}
+
+// Process %level%.ini (ATX format) for dino relocation.
+// Master toggle: Randomization=1 in [TrespasserPlus]
+static void SpawnLocDinos(const char* pszLevelBase)
+{
+	if (!GetModValue("Randomization", 1))
+		return;
+
+	// Seed LCG once (tick count varies per session)
+	if (!g_u4RandSeed)
+		g_u4RandSeed = GetTickCount() | 1;
+
+	char szPath[_MAX_PATH];
+	char szBase[_MAX_PATH];
+
+	GetRegString(REG_KEY_DATA_DRIVE, szBase, sizeof(szBase), ".\\");
+	strcat(szBase, "data\\");
+	lstrcpy(szPath, szBase);
+	lstrcat(szPath, pszLevelBase);
+	lstrcat(szPath, ".ini");
+
+	if (GetFileAttributes(szPath) == 0xFFFFFFFF)
+		return;
+
+	char szInst[64], szReserve[64];
+	GetPrivateProfileString("Instances", "Instance1", "", szInst, sizeof(szInst), szPath);
+	GetPrivateProfileString("Instances", "Reserve1", "", szReserve, sizeof(szReserve), szPath);
+	if (szInst[0] == '\0' && szReserve[0] == '\0')
+		return;
+
+	const char* pszName = szInst[0] ? szInst : szReserve;
+	int iNameLen = lstrlen(pszName);
+
+	float afLocs[32][3];
+	int iNumLocs = 0;
+	char szKey[16];
+	for (int iLoc = 1; iLoc <= 32; iLoc++)
+	{
+		wsprintf(szKey, "Location%d", iLoc);
+		char szVal[128];
+		GetPrivateProfileString(pszName, szKey, "", szVal, sizeof(szVal), szPath);
+		if (szVal[0] == '\0') break;
+
+		const char* p = szVal;
+		if (bParseCoord(p, afLocs[iNumLocs][0]) &&
+		    bParseCoord(p, afLocs[iNumLocs][1]) &&
+		    bParseCoord(p, afLocs[iNumLocs][2]))
+			iNumLocs++;
+	}
+
+	if (iNumLocs > 0)
+	{
+		g_u4RandSeed = g_u4RandSeed * 1664525 + 1013904223;
+		int iPick = g_u4RandSeed % iNumLocs;
+		CAnimal* pani = paniFindByName(pszName, iNameLen);
+		if (pani)
+			RelocateAnimal(pani, afLocs[iPick][0], afLocs[iPick][1], afLocs[iPick][2]);
+	}
+}
+
 int CTPassGlobals::LoadLevel(LPCSTR pszName)
 {
     int     iRet;
@@ -317,6 +443,10 @@ int CTPassGlobals::LoadLevel(LPCSTR pszName)
     strcat(szFile, pszName);
 
     iRet = LoadScene(szFile, (LPSTR)pszName);
+
+	// Relocate animals matching .loc entries (after level is loaded)
+	if (iRet >= 0)
+		SpawnLocDinos(g_szCurrentLevelBase);
 
     return iRet;
 }

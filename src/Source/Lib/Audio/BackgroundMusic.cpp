@@ -470,9 +470,12 @@ void CBackgroundMusic::PlayPlaylistStart()
 	// Shuffle if enabled
 	if (GetModValue("Shuffle", 1))
 	{
+		// Simple LCG seeded with tick count (varies per session, no srand)
+		uint32 u4 = GetTickCount();
 		for (int i = m_iPlaylistCount - 1; i > 0; i--)
 		{
-			int j = rand() % (i + 1);
+			u4 = u4 * 1664525 + 1013904223;
+			int j = u4 % (i + 1);
 			int t = m_iShuffleOrder[i];
 			m_iShuffleOrder[i] = m_iShuffleOrder[j];
 			m_iShuffleOrder[j] = t;
@@ -516,9 +519,11 @@ void CBackgroundMusic::PlayNextPlaylistTrack()
 	// Re-shuffle when wrapping around
 	if (m_iPlaylistIndex == 0 && GetModValue("Shuffle", 1))
 	{
+		uint32 u4 = GetTickCount();
 		for (int i = m_iPlaylistCount - 1; i > 0; i--)
 		{
-			int j = rand() % (i + 1);
+			u4 = u4 * 1664525 + 1013904223;
+			int j = u4 % (i + 1);
 			int t = m_iShuffleOrder[i];
 			m_iShuffleOrder[i] = m_iShuffleOrder[j];
 			m_iShuffleOrder[j] = t;

@@ -295,7 +295,9 @@ bool IsHardcore();
 	//*****************************************************************************************
 	CInstance* CAnimal::pinsCopy() const
 	{
-//		AlwaysAssert(false);
+		// CAnimal cannot be trivially copied — brain and physics are
+		// complex objects that must be created from GROFF data.
+		// Use the default constructor path in SpawnLocDinos instead.
 		return 0;
 	}
 

@@ -109,6 +109,7 @@
 #define REG_KEY_HARDCORE            "Hardcore"
 #define REG_KEY_SHUFFLE             "Shuffle"
 #define REG_KEY_LOGGING             "Logging"
+#define REG_KEY_RANDOMIZATION       "Randomization"
 
 // Registry entries for error handling.
 #define REG_KEY_AUTOSAVE            "Auto Save"
@@ -133,6 +134,7 @@
 #define DEFAULT_HARDCORE            1
 #define DEFAULT_SHUFFLE             1
 #define DEFAULT_LOGGING             0
+#define DEFAULT_RANDOMIZATION       1
 #define DEFAULT_VIEWPORT_X          0
 #define DEFAULT_VIEWPORT_Y          0
 

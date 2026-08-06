@@ -409,7 +409,7 @@ void CControlsWnd::UIHotspotClick(CUIHotspot * pctrl, BOOL bDown)
         // Gore Toggle
         if (pctrl->GetID() == 101)
         {
-            m_iGore = ++m_iGore % 2;
+            m_iGore = ++m_iGore % 3;
 
             UpdateGore();
         }

@@ -63,6 +63,8 @@ enum
     CHEAT_ALLAMMO,
     CHEAT_SLOMO,
 	CHEAT_DINOS,
+	CHEAT_SPEED,
+	CHEAT_SAVELOC,
 };
 
 struct
@@ -83,6 +85,8 @@ struct
     "WOO", CHEAT_ALLAMMO,
     "BIONICWOMAN", CHEAT_SLOMO,
 	"DINOS", CHEAT_DINOS,
+	"SPEED", CHEAT_SPEED,
+	"SAVELOC", CHEAT_SAVELOC,
 };
 
 int g_icCheats = sizeof(CHEATS) / sizeof(CHEATS[0]);
@@ -241,6 +245,28 @@ bool ExecuteCheat(LPSTR pszCheat)
 				// Toggle the boring dino bit.
 				gaiSystem.bBoring = !gaiSystem.bBoring;
 			}
+			break;
+		case CHEAT_SPEED:
+			{
+				if (CMessageStep::sMultiplier == 1.0f)
+					CMessageStep::sMultiplier = 3.0f;
+				else
+					CMessageStep::sMultiplier = 1.0f;
+			}
+			break;
+		case CHEAT_SAVELOC:
+			{
+				FILE* f = fopen("location.log", "a");
+				if (f)
+				{
+					fprintf(f, "%.1f, %.1f, %.1f\n",
+						gpPlayer->v3Pos().tX,
+						gpPlayer->v3Pos().tY,
+						gpPlayer->v3Pos().tZ);
+					fclose(f);
+				}
+			}
+			break;
     }
 
     bRet = TRUE;
@@ -532,26 +558,41 @@ void CGameWnd::OnKey(UINT vk, BOOL fDown, int cRepeat, UINT flags)
             }
             break;
 
-        case VK_F11:
-			if (GetAsyncKeyState(VK_CONTROL) < 0)
-			{
+        case 0xC0:  // tilde ~ key (VK_OEM_3, standalone)
+            {
                 if (m_puictlCheat->GetVisible())
                 {
                     ClearInputState(true);
-
                     gpInputDeemone->Capture(true);
-
                     m_puictlCheat->SetVisible(FALSE);
                 }
                 else
                 {
                     ClearInputState(false);
-
                     gpInputDeemone->Capture(false);
                     m_puictlCheat->SetVisible(TRUE);
                     m_puictlCheat->SetText(NULL);
                 }
+                m_iClear = 3;
+            }
+            break;
 
+	    case VK_F11:  // Ctrl+F11 (original)
+			if (GetAsyncKeyState(VK_CONTROL) < 0)
+			{
+                if (m_puictlCheat->GetVisible())
+                {
+                    ClearInputState(true);
+                    gpInputDeemone->Capture(true);
+                    m_puictlCheat->SetVisible(FALSE);
+                }
+                else
+                {
+                    ClearInputState(false);
+                    gpInputDeemone->Capture(false);
+                    m_puictlCheat->SetVisible(TRUE);
+                    m_puictlCheat->SetText(NULL);
+                }
                 m_iClear = 3;
             }
             break;

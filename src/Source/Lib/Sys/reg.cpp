@@ -90,6 +90,7 @@ static void WriteDefaults()
 	SetModValue(REG_KEY_SHUFFLE,              DEFAULT_SHUFFLE);
 	SetModValue(REG_KEY_HARDCORE,             DEFAULT_HARDCORE);
 	SetModValue(REG_KEY_LOGGING,             DEFAULT_LOGGING);
+	SetModValue(REG_KEY_RANDOMIZATION,       DEFAULT_RANDOMIZATION);
 
 	// Gameplay
 	SetRegValue(REG_KEY_GORE,                 3);
@@ -118,6 +119,34 @@ void OpenKey()
 	if (GetFileAttributes(g_szConfigPath) == 0xFFFFFFFF)
 	{
 		WriteDefaults();
+
+		// Insert blank line before [TrespasserPlus] for readability
+		HANDLE hf = CreateFile(g_szConfigPath, GENERIC_READ, 0, NULL,
+		                       OPEN_EXISTING, 0, NULL);
+		if (hf != INVALID_HANDLE_VALUE)
+		{
+			DWORD sz = GetFileSize(hf, NULL);
+			char* pBuf = (char*)malloc(sz + 4);
+			DWORD br;
+			ReadFile(hf, pBuf, sz, &br, NULL);
+			CloseHandle(hf);
+			pBuf[sz] = '\0';
+
+			char* pSec = strstr(pBuf, "\n[TrespasserPlus]");
+			if (pSec && (pSec == pBuf || pSec[-1] != '\n'))
+			{
+				// No blank line before section — insert one
+				int iPos = (int)(pSec - pBuf) + 1;
+				hf = CreateFile(g_szConfigPath, GENERIC_WRITE, 0, NULL,
+				                CREATE_ALWAYS, 0, NULL);
+				DWORD bw;
+				WriteFile(hf, pBuf, iPos, &bw, NULL);
+				WriteFile(hf, "\r\n", 2, &bw, NULL);
+				WriteFile(hf, pBuf + iPos, sz - iPos, &bw, NULL);
+				CloseHandle(hf);
+			}
+			free(pBuf);
+		}
 	}
 
 	// Get ready for safe mode.
