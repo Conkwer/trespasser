@@ -106,7 +106,9 @@
 #define REG_KEY_KEYMAP              "KeyMap"
 #define REG_KEY_GORE                "Gore"
 #define REG_KEY_INVERTMOUSE         "InvertMouse"
-#define REG_KEY_DIFFICULTY          "Difficulty"
+#define REG_KEY_HARDCORE            "Hardcore"
+#define REG_KEY_SHUFFLE             "Shuffle"
+#define REG_KEY_LOGGING             "Logging"
 
 // Registry entries for error handling.
 #define REG_KEY_AUTOSAVE            "Auto Save"
@@ -128,7 +130,9 @@
 #define DEFAULT_GAMMA               5
 #define DEFAULT_GORE                1
 #define DEFAULT_INVERTMOUSE         FALSE
-#define DEFAULT_DIFFICULTY          0
+#define DEFAULT_HARDCORE            1
+#define DEFAULT_SHUFFLE             1
+#define DEFAULT_LOGGING             0
 #define DEFAULT_VIEWPORT_X          0
 #define DEFAULT_VIEWPORT_Y          0
 

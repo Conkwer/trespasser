@@ -32,6 +32,7 @@
 #include "..\Game\AI\AIMain.hpp"
 
 BOOL bQuitGame = FALSE;
+bool s_bBgmAttempted = false;
 
 
 extern CPlayer *    gpPlayer;
@@ -264,6 +265,7 @@ CGameWnd::CGameWnd(CUIManager * puimgr) : CUIWnd(puimgr)
     m_puictlCheat = NULL;
 	g_CTPassGlobals.bInGame = true;
 	g_CTPassGlobals.bHardReset = true;
+	s_bBgmAttempted = false;
 }
 
 CGameWnd::~CGameWnd()
@@ -699,6 +701,14 @@ void CGameWnd::InnerLoopCall()
 
 		// Don't step just now.
 		return;
+	}
+
+	// Start level BGM on first frame after loading completes
+	if (!s_bBgmAttempted && !g_BackgroundMusic.IsPlaying())
+	{
+		s_bBgmAttempted = true;
+		if (GetModValue("EnableBackgroundMusic", 1) && g_szCurrentLevelBase[0] != '\0')
+			g_BackgroundMusic.PlayLevelTrack(g_szCurrentLevelBase);
 	}
 
 	gmlGameLoop.Step();

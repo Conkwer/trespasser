@@ -83,6 +83,8 @@ private:
 };
 
 extern CTPassGlobals     g_CTPassGlobals;
+extern char              g_szCurrentLevelBase[_MAX_PATH];
+extern bool              s_bBgmAttempted;
 
 #endif // __TPASSGLOBALS_H__
 

@@ -7,9 +7,12 @@
 #include <windows.h>
 #include <dsound.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 
 #include "BackgroundMusic.hpp"
+#include "..\Sys\reg.h"
+#include "..\Sys\RegInit.hpp"
 
 extern HWND g_hwnd;
 
@@ -20,6 +23,10 @@ static bool                g_bHaveDS = false;
 
 static void BgmLog(const char* fmt, ...)
 {
+	// Skip logging unless enabled in [TrespasserPlus]
+	if (!GetModValue("Logging", 0))
+		return;
+
 	FILE* f = fopen("bgmusic.log", "a");
 	if (f) {
 		va_list a; va_start(a, fmt);
@@ -216,8 +223,132 @@ static DWORD DecodeADPCM(BYTE* pSrc, DWORD srcSize, DWORD blockAlign,
 	return (DWORD)(pDst - pDstStart);
 }
 
-CBackgroundMusic::CBackgroundMusic()  { m_bPlaying = false; }
+CBackgroundMusic::CBackgroundMusic()
+{
+	m_bPlaying = false;
+	m_bPlaylist = false;
+	m_iPlaylistCount = 0;
+	m_iPlaylistIndex = 0;
+	m_aszPlaylistDir[0] = '\0';
+}
+
 CBackgroundMusic::~CBackgroundMusic() { Stop(); }
+
+// Decode a single audio file to 16-bit stereo/mono PCM.
+// Caller must free *ppPCM on success.
+static bool DecodeFileToPCM(const char* pszFile, BYTE** ppPCM, DWORD* pSize,
+                            int* pCh, int* pRate)
+{
+	const char* pszExt = strrchr(pszFile, '.');
+	if (!pszExt) return false;
+
+	*ppPCM = NULL; *pSize = 0; *pCh = 0; *pRate = 0;
+
+	if (lstrcmpi(pszExt, ".adx") == 0)
+	{
+		HANDLE hf = CreateFile(pszFile, GENERIC_READ, FILE_SHARE_READ,
+		                       NULL, OPEN_EXISTING, 0, NULL);
+		if (hf == INVALID_HANDLE_VALUE) return false;
+		DWORD fs = GetFileSize(hf, NULL);
+		BYTE* pd = (BYTE*)malloc(fs);
+		if (!pd) { CloseHandle(hf); return false; }
+		ReadFile(hf, pd, fs, &fs, NULL); CloseHandle(hf);
+		if (fs < 24 || pd[0] != 0x80) { free(pd); return false; }
+		*pCh = pd[7];
+		*pRate = (pd[8] << 24) | (pd[9] << 16) | (pd[10] << 8) | pd[11];
+		if (*pCh < 1 || *pCh > 2) *pCh = 2;
+		if (*pRate < 4000 || *pRate > 96000) *pRate = 44100;
+		*ppPCM = (BYTE*)malloc(fs * 4 + 4096);
+		DWORD dwDec = DecodeADX(pd, fs, *pCh, *ppPCM, fs * 4);
+		if (dwDec == 0) { free(pd); free(*ppPCM); return false; }
+		*pSize = dwDec; free(pd);
+	}
+	else if (lstrcmpi(pszExt, ".cau") == 0)
+	{
+		HANDLE hf = CreateFile(pszFile, GENERIC_READ, FILE_SHARE_READ,
+		                       NULL, OPEN_EXISTING, 0, NULL);
+		if (hf == INVALID_HANDLE_VALUE) return false;
+		CAUHeader cau; DWORD br;
+		ReadFile(hf, &cau, sizeof(cau), &br, NULL);
+		if (cau.magic != 'ROBW') { CloseHandle(hf); return false; }
+		*pCh = cau.channels; *pRate = cau.frequency;
+		if (cau.compression == 0)
+		{
+			*pSize = cau.dataSize;
+			*ppPCM = (BYTE*)malloc(*pSize);
+			SetFilePointer(hf, cau.offset, NULL, FILE_BEGIN);
+			ReadFile(hf, *ppPCM, *pSize, &br, NULL);
+		}
+		else if (cau.compression == 1)
+		{
+			BYTE* pComp = (BYTE*)malloc(cau.dataSize);
+			SetFilePointer(hf, cau.offset, NULL, FILE_BEGIN);
+			ReadFile(hf, pComp, cau.dataSize, &br, NULL);
+			*pSize = cau.decompSize;
+			*ppPCM = (BYTE*)malloc(*pSize + 4096);
+			DWORD dwDec = 0;
+			if (*pCh == 2)
+				dwDec = DecodeADPCM(pComp, cau.dataSize, cau.blockAlign, *ppPCM, *pSize);
+			free(pComp);
+			if (dwDec == 0) { free(*ppPCM); CloseHandle(hf); return false; }
+			*pSize = dwDec;
+		}
+		else { CloseHandle(hf); return false; }
+		CloseHandle(hf);
+	}
+	else if (lstrcmpi(pszExt, ".wav") == 0)
+	{
+		HANDLE hf = CreateFile(pszFile, GENERIC_READ, FILE_SHARE_READ,
+		                       NULL, OPEN_EXISTING, 0, NULL);
+		if (hf == INVALID_HANDLE_VALUE) return false;
+		DWORD fs = GetFileSize(hf, NULL);
+		BYTE* pd = (BYTE*)malloc(fs);
+		if (!pd) { CloseHandle(hf); return false; }
+		ReadFile(hf, pd, fs, &fs, NULL); CloseHandle(hf);
+		if (memcmp(pd,"RIFF",4) || memcmp(pd+8,"WAVE",4))
+			{ free(pd); return false; }
+		WORD fmtTag = *(WORD*)(pd + 20);
+		*pCh  = *(WORD*)(pd + 22);
+		*pRate = *(DWORD*)(pd + 24);
+		// Find data chunk
+		DWORD pos = 36;
+		if (fmtTag == 0x11) { WORD cb = *(WORD*)(pd + 34); pos = 36 + cb; }
+		while (pos < fs - 8 && memcmp(pd + pos, "data", 4) != 0)
+			{ DWORD cs = *(DWORD*)(pd + pos + 4); pos += 8 + cs; }
+		if (pos >= fs - 8 || memcmp(pd + pos, "data", 4) != 0)
+			{ free(pd); return false; }
+		DWORD dataSize = *(DWORD*)(pd + pos + 4);
+		BYTE* pData = pd + pos + 8;
+		if (fmtTag == 1)
+		{
+			*pSize = dataSize;
+			*ppPCM = (BYTE*)malloc(*pSize);
+			if (*ppPCM) memcpy(*ppPCM, pData, *pSize);
+		}
+		else if (fmtTag == 0x11)
+		{
+			DWORD blockAlign = *(WORD*)(pd + 32);
+			*ppPCM = (BYTE*)malloc(dataSize * 4 + 4096);
+			DWORD dwDec = DecodeADPCM(pData, dataSize, blockAlign, *ppPCM, dataSize * 4);
+			if (dwDec == 0) { free(pd); free(*ppPCM); return false; }
+			*pSize = dwDec;
+		}
+		else { free(pd); return false; }
+		free(pd);
+	}
+	else if (lstrcmpi(pszExt, ".ogg") == 0)
+	{
+		short* pcm; int n;
+		n = stb_vorbis_decode_filename(pszFile, pCh, pRate, &pcm);
+		if (n <= 0) return false;
+		*pSize = n * sizeof(short);
+		*ppPCM = (BYTE*)pcm;
+	}
+	else
+		return false;
+
+	return (*ppPCM != NULL);
+}
 
 bool CBackgroundMusic::Play(const char* pszFilename)
 {
@@ -229,139 +360,66 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 	if (GetFileAttributes(pszFilename) == 0xFFFFFFFF)
 		return false;
 
+	// --- M3U playlist: parse tracks, play one at a time ---
+	if (lstrcmpi(pszExt, ".m3u") == 0)
+	{
+		HANDLE hf = CreateFile(pszFilename, GENERIC_READ, FILE_SHARE_READ,
+		                       NULL, OPEN_EXISTING, 0, NULL);
+		if (hf == INVALID_HANDLE_VALUE) return false;
+		DWORD fs = GetFileSize(hf, NULL);
+		char* pM3u = (char*)malloc(fs + 1);
+		if (!pM3u) { CloseHandle(hf); return false; }
+		ReadFile(hf, pM3u, fs, &fs, NULL); CloseHandle(hf);
+		pM3u[fs] = '\0';
+
+		// Build directory prefix (tracks are relative to playlist)
+		lstrcpy(m_aszPlaylistDir, pszFilename);
+		char* pSlash = strrchr(m_aszPlaylistDir, '\\');
+		if (pSlash) *(pSlash + 1) = '\0'; else m_aszPlaylistDir[0] = '\0';
+
+		// Parse track names
+		m_iPlaylistCount = 0;
+		char* pLine = pM3u;
+		while (*pLine && m_iPlaylistCount < MAX_PLAYLIST_TRACKS)
+		{
+			while (*pLine == '\r' || *pLine == '\n') pLine++;
+			if (!*pLine) break;
+			char* pEnd = pLine;
+			while (*pEnd && *pEnd != '\r' && *pEnd != '\n') pEnd++;
+			char cSaved = *pEnd;
+			*pEnd = '\0';
+
+			if (*pLine != '#' && *pLine != '\0')
+				lstrcpy(m_aszPlaylistNames[m_iPlaylistCount++], pLine);
+
+			*pEnd = cSaved;
+			pLine = pEnd;
+			if (*pLine) pLine++;
+		}
+		free(pM3u);
+
+		if (m_iPlaylistCount == 0) return false;
+		BgmLog("  M3U: %d tracks parsed", m_iPlaylistCount);
+		PlayPlaylistStart();
+		return (m_bPlaying);
+	}
+
+	// --- Single file ---
+	return PlayTrack(pszFilename, true);
+}
+
+// Decode a file, create DS buffer, fill with PCM, and start playback.
+// bLoop: true for single files, false for individual playlist tracks.
+bool CBackgroundMusic::PlayTrack(const char* pszFile, bool bLoop)
+{
+	// Release previous buffer (for playlist track transitions)
+	if (g_pDSBuf) { g_pDSBuf->Stop(); g_pDSBuf->Release(); g_pDSBuf = NULL; }
+
 	BYTE* pPCM = NULL; DWORD sz = 0; int ch = 0, sr = 0;
 
-	if (lstrcmpi(pszExt, ".adx") == 0)
-	{
-		HANDLE hf = CreateFile(pszFilename, GENERIC_READ, FILE_SHARE_READ,
-		                       NULL, OPEN_EXISTING, 0, NULL);
-		if (hf == INVALID_HANDLE_VALUE) return false;
-		DWORD fs = GetFileSize(hf, NULL);
-		BYTE* pd = (BYTE*)malloc(fs);
-		if (!pd) { CloseHandle(hf); return false; }
-		ReadFile(hf, pd, fs, &fs, NULL); CloseHandle(hf);
-		if (fs < 24 || pd[0] != 0x80) { BgmLog("  FAIL: not ADX"); free(pd); return false; }
-			ch = pd[7];
-			sr = (pd[8] << 24) | (pd[9] << 16) | (pd[10] << 8) | pd[11];
-			if (ch < 1 || ch > 2) ch = 2;
-			if (sr < 4000 || sr > 96000) sr = 44100;
-			BgmLog("  ADX: %dch %dHz type=%d", ch, sr, pd[4]);
-		pPCM = (BYTE*)malloc(fs * 4 + 4096);
-		DWORD dwDec = DecodeADX(pd, fs, ch, pPCM, fs * 4);
-		if (dwDec == 0) { BgmLog("  FAIL: ADX decode"); free(pd); free(pPCM); return false; }
-		sz = dwDec; free(pd);
-		BgmLog("  ADX decoded: %d bytes PCM", sz);
-	}
-	else if (lstrcmpi(pszExt, ".cau") == 0)
-	{
-		HANDLE hf = CreateFile(pszFilename, GENERIC_READ, FILE_SHARE_READ,
-		                       NULL, OPEN_EXISTING, 0, NULL);
-		if (hf == INVALID_HANDLE_VALUE) return false;
-		CAUHeader cau; DWORD br;
-		ReadFile(hf, &cau, sizeof(cau), &br, NULL);
-		if (cau.magic != 'ROBW')
-			{ BgmLog("  FAIL: bad CAU magic"); CloseHandle(hf); return false; }
-		ch = cau.channels; sr = cau.frequency;
-		BgmLog("  CAU: %dHz %dch comp=%d data=%d decomp=%d align=%d",
-		       sr, ch, cau.compression, cau.dataSize, cau.decompSize, cau.blockAlign);
-
-		if (cau.compression == 0)
-		{
-			// Raw PCM — read directly
-			sz = cau.dataSize;
-			pPCM = (BYTE*)malloc(sz);
-			SetFilePointer(hf, cau.offset, NULL, FILE_BEGIN);
-			ReadFile(hf, pPCM, sz, &br, NULL);
-		}
-		else if (cau.compression == 1)
-		{
-			// IMA ADPCM — decode
-			BYTE* pComp = (BYTE*)malloc(cau.dataSize);
-			SetFilePointer(hf, cau.offset, NULL, FILE_BEGIN);
-			ReadFile(hf, pComp, cau.dataSize, &br, NULL);
-			sz = cau.decompSize;
-			pPCM = (BYTE*)malloc(sz + 4096);
-			DWORD dwDec = 0;
-			if (ch == 2)
-				dwDec = DecodeADPCM(pComp, cau.dataSize, cau.blockAlign, pPCM, sz);
-			if (dwDec == 0)
-				{ BgmLog("  FAIL: ADPCM decode"); free(pComp); free(pPCM); CloseHandle(hf); return false; }
-			sz = dwDec;
-			free(pComp);
-			BgmLog("  ADPCM decoded: %d bytes PCM", sz);
-		}
-		else
-			{ BgmLog("  FAIL: unknown compression %d", cau.compression); CloseHandle(hf); return false; }
-		CloseHandle(hf);
-	}
-	else if (lstrcmpi(pszExt, ".wav") == 0)
-	{
-		HANDLE hf = CreateFile(pszFilename, GENERIC_READ, FILE_SHARE_READ,
-		                       NULL, OPEN_EXISTING, 0, NULL);
-		if (hf == INVALID_HANDLE_VALUE) return false;
-		DWORD fs = GetFileSize(hf, NULL);
-		BYTE* pd = (BYTE*)malloc(fs);
-		if (!pd) { CloseHandle(hf); return false; }
-		ReadFile(hf, pd, fs, &fs, NULL); CloseHandle(hf);
-		if (memcmp(pd,"RIFF",4) || memcmp(pd+8,"WAVE",4))
-			{ BgmLog("  FAIL: not WAV"); free(pd); return false; }
-
-		WORD fmtTag = *(WORD*)(pd + 20);
-		ch  = *(WORD*)(pd + 22);
-		sr  = *(DWORD*)(pd + 24);
-		DWORD blockAlign = *(WORD*)(pd + 32);
-		// Find the 'data' chunk (skip fmt + optional fact chunks)
-		DWORD pos = 36; // after standard fmt header
-		// If PCM, pos is 36. If ADPCM, fmt chunk may be larger (extra bytes).
-		if (fmtTag == 0x11) // IMA ADPCM
-		{
-			WORD cbSize = *(WORD*)(pd + 34); // extra format bytes
-			pos = 36 + cbSize; // skip past fmt chunk
-		}
-		// Skip any intermediate chunks (fact, etc.) to find 'data'
-		while (pos < fs - 8 && memcmp(pd + pos, "data", 4) != 0)
-		{
-			DWORD chunkSize = *(DWORD*)(pd + pos + 4);
-			pos += 8 + chunkSize;
-		}
-		if (pos >= fs - 8 || memcmp(pd + pos, "data", 4) != 0)
-			{ BgmLog("  FAIL: no data chunk"); free(pd); return false; }
-		DWORD dataSize = *(DWORD*)(pd + pos + 4);
-		BYTE* pData = pd + pos + 8;
-
-		if (fmtTag == 1) // PCM
-		{
-			sz = dataSize;
-			pPCM = (BYTE*)malloc(sz);
-			if (pPCM) memcpy(pPCM, pData, sz);
-		}
-		else if (fmtTag == 0x11) // IMA ADPCM
-		{
-			BgmLog("  WAV ADPCM: align=%d data=%d", blockAlign, dataSize);
-			sz = 0; // will be set by decoder
-			pPCM = (BYTE*)malloc(dataSize * 4 + 4096); // worst case: 4x expansion
-			DWORD dwDec = DecodeADPCM(pData, dataSize, blockAlign, pPCM, dataSize * 4);
-			if (dwDec == 0)
-				{ BgmLog("  FAIL: ADPCM decode"); free(pd); free(pPCM); return false; }
-			sz = dwDec;
-			BgmLog("  ADPCM decoded: %d bytes PCM", sz);
-		}
-		else { BgmLog("  FAIL: unsupported WAV tag %d", fmtTag); free(pd); return false; }
-		free(pd);
-	}
-	else if (lstrcmpi(pszExt, ".ogg") == 0)
-	{
-		short* pcm; int n;
-		n = stb_vorbis_decode_filename(pszFilename, &ch, &sr, &pcm);
-		BgmLog("  OGG: %d samples %dch %dHz", n, ch, sr);
-		if (n <= 0) return false;
-		sz = n * sizeof(short);
-		pPCM = (BYTE*)pcm;
-	}
-	else
+	if (!DecodeFileToPCM(pszFile, &pPCM, &sz, &ch, &sr))
 		return false;
 
-	if (!pPCM) return false;
 	g_dwRate = sr;
 
 	if (!g_bHaveDS)
@@ -392,17 +450,124 @@ bool CBackgroundMusic::Play(const char* pszFilename)
 
 	g_pDSBuf->SetFrequency(sr);
 	g_pDSBuf->SetCurrentPosition(0);
-	g_pDSBuf->Play(0, 0, DSBPLAY_LOOPING);
+	g_pDSBuf->Play(0, 0, bLoop ? DSBPLAY_LOOPING : 0);
 
 	m_bPlaying = true;
-	BgmLog("  SUCCESS: %d bytes @ %dHz", sz, sr);
+	m_bPlaylist = !bLoop;  // playlist tracks don't loop
+	BgmLog("  SUCCESS: %d bytes @ %dHz %s", sz, sr, bLoop ? "loop" : "once");
 	return true;
+}
+
+// Pick first playlist track (shuffle if configured) and start playback.
+void CBackgroundMusic::PlayPlaylistStart()
+{
+	m_bPlaylist = true;
+
+	// Build shuffle order: identity by default
+	for (int i = 0; i < m_iPlaylistCount; i++)
+		m_iShuffleOrder[i] = i;
+
+	// Shuffle if enabled
+	if (GetModValue("Shuffle", 1))
+	{
+		for (int i = m_iPlaylistCount - 1; i > 0; i--)
+		{
+			int j = rand() % (i + 1);
+			int t = m_iShuffleOrder[i];
+			m_iShuffleOrder[i] = m_iShuffleOrder[j];
+			m_iShuffleOrder[j] = t;
+		}
+	}
+
+	m_iPlaylistIndex = 0;
+	PlayNextPlaylistTrack();
+}
+
+// Advance to next playlist track, wrapping around.
+void CBackgroundMusic::PlayNextPlaylistTrack()
+{
+	int iTrack = m_iShuffleOrder[m_iPlaylistIndex];
+
+	// Build full path: dir + name
+	char szTrack[_MAX_PATH];
+	if (strchr(m_aszPlaylistNames[iTrack], ':'))
+		lstrcpy(szTrack, m_aszPlaylistNames[iTrack]);
+	else
+	{
+		lstrcpy(szTrack, m_aszPlaylistDir);
+		lstrcat(szTrack, m_aszPlaylistNames[iTrack]);
+	}
+
+	BgmLog("  Playlist track %d/%d: %s", m_iPlaylistIndex + 1, m_iPlaylistCount,
+	       m_aszPlaylistNames[iTrack]);
+
+	if (!PlayTrack(szTrack, false))
+	{
+		// Skip broken tracks, try next
+		m_iPlaylistIndex = (m_iPlaylistIndex + 1) % m_iPlaylistCount;
+		m_bPlaying = false;
+		return;
+	}
+
+	m_bPlaying = true;
+	m_bPlaylist = true;
+	m_iPlaylistIndex = (m_iPlaylistIndex + 1) % m_iPlaylistCount;
+
+	// Re-shuffle when wrapping around
+	if (m_iPlaylistIndex == 0 && GetModValue("Shuffle", 1))
+	{
+		for (int i = m_iPlaylistCount - 1; i > 0; i--)
+		{
+			int j = rand() % (i + 1);
+			int t = m_iShuffleOrder[i];
+			m_iShuffleOrder[i] = m_iShuffleOrder[j];
+			m_iShuffleOrder[j] = t;
+		}
+	}
+}
+
+// Try to play a single file or M3U playlist for a level.
+// Priority: %level%.m3u > trespasser.m3u > single file (.cau/.adx/.wav)
+bool CBackgroundMusic::PlayLevelTrack(const char* pszLevelBase)
+{
+	char szPath[_MAX_PATH];
+	char szBase[_MAX_PATH];
+
+	GetRegString(REG_KEY_DATA_DRIVE, szBase, sizeof(szBase), ".\\");
+	strcat(szBase, "data\\");
+
+	// 1) Per-level playlist: %level%.m3u
+	lstrcpy(szPath, szBase);
+	lstrcat(szPath, pszLevelBase);
+	lstrcat(szPath, ".m3u");
+	if (GetFileAttributes(szPath) != 0xFFFFFFFF)
+		return Play(szPath);
+
+	// 2) Global playlist: trespass.m3u
+	lstrcpy(szPath, szBase);
+	lstrcat(szPath, "trespass.m3u");
+	if (GetFileAttributes(szPath) != 0xFFFFFFFF)
+		return Play(szPath);
+
+	// 3) Single file: .cau, .adx, .wav
+	static const char* exts[] = { ".cau", ".adx", ".wav" };
+	for (int e = 0; e < 3; e++)
+	{
+		lstrcpy(szPath, szBase);
+		lstrcat(szPath, pszLevelBase);
+		lstrcat(szPath, exts[e]);
+		if (Play(szPath))
+			return true;
+	}
+	return false;
 }
 
 void CBackgroundMusic::Stop()
 {
 	if (g_pDSBuf) { g_pDSBuf->Stop(); g_pDSBuf->Release(); g_pDSBuf = NULL; }
 	m_bPlaying = false;
+	m_bPlaylist = false;
+	m_iPlaylistCount = 0;
 }
 
 void CBackgroundMusic::InnerLoopCall()
@@ -410,6 +575,15 @@ void CBackgroundMusic::InnerLoopCall()
 	if (!m_bPlaying || !g_pDSBuf) return;
 	if (g_dwRate)
 		g_pDSBuf->SetFrequency(g_dwRate);
+
+	// Playlist mode: detect end of track, advance to next
+	if (m_bPlaylist)
+	{
+		DWORD dwStatus = 0;
+		g_pDSBuf->GetStatus(&dwStatus);
+		if (!(dwStatus & DSBSTATUS_PLAYING))
+			PlayNextPlaylistTrack();
+	}
 }
 
 CBackgroundMusic g_BackgroundMusic;

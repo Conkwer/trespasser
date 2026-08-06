@@ -40,6 +40,7 @@
 #include "Lib/EntityDBase/MessageTypes/MsgCollision.hpp"
 #include "Lib/EntityDBase/MessageTypes/MsgMove.hpp"
 #include "Lib/EntityDBase/MessageTypes/MsgTrigger.hpp"
+#include "Lib/EntityDBase/MessageTypes/MsgStep.hpp"
 #include "Lib/Groff/VTParse.hpp"
 #include "Lib/Sys/DebugConsole.hpp"
 #include "Lib/EntityDBase/WorldDBase.hpp"
@@ -57,7 +58,7 @@ extern CProfileStat psCollisionMsgBrain;
 // CAnimal implementation.
 //
 
-int GetDifficulty();
+bool IsHardcore();
 	
 	//******************************************************************************************
 	CAnimal::CAnimal()
@@ -207,9 +208,9 @@ int GetDifficulty();
 		pbrBrain->HandleMessage(msgdeath);
 
 		// Hardcore: only process for the animal that actually died.
-		if (GetDifficulty() >= 1 && msgdeath.paniDyingThing == this)
+		if (IsHardcore() && msgdeath.paniDyingThing == this)
 		{
-			TSec sNow = gaiSystem.sNow;
+			TSec sNow = CMessageStep::sStaticTotal;
 			if (iReviveCount == 0)
 				fReviveTime = sNow + 10.0f;
 			else if (iReviveCount == 1)
@@ -237,7 +238,7 @@ int GetDifficulty();
 	{
 		CAnimate::Process(msgstep);
 
-		if (GetDifficulty() < 1)
+		if (!IsHardcore())
 			return;
 
 		if (bDead() && fReviveTime > 0.0f && msgstep.sTotal >= fReviveTime)
@@ -274,7 +275,7 @@ int GetDifficulty();
 			return;
 
 		// Hardcore: revived dinos deal extra damage.
-		if (GetDifficulty() >= 1 && f_damage > 0.0f && pins_aggressor)
+		if (IsHardcore() && f_damage > 0.0f && pins_aggressor)
 		{
 			CBoundaryBox* pbb = ptCast<CBoundaryBox>((CInstance*)pins_aggressor);
 			if (pbb && pbb->paniAnimate && pbb->paniAnimate->iReviveCount > 0)

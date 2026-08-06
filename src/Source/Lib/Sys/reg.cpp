@@ -13,7 +13,8 @@
 #define REGLOCATION "Software\\DreamWorks Interactive\\Trespasser Demo"
 #endif
 
-static const char* g_pszIniSection = "Settings";
+static const char* g_pszIniSection    = "Settings";
+static const char* g_pszModSection   = "TrespasserPlus";
 
 //
 // Module specific variables.
@@ -76,21 +77,23 @@ static void WriteDefaults()
 	SetRegValue(REG_KEY_RENDERING_QUALITY,    2);
 	SetRegValue(REG_KEY_GAMMA,                3);
 
-	// Audio: all on by default
-	SetRegValue(REG_KEY_AUDIO_EFFECT,         -1);
-	SetRegValue(REG_KEY_AUDIO_AMBIENT,        -1);
-	SetRegValue(REG_KEY_AUDIO_VOICEOVER,      -1);
-	SetRegValue(REG_KEY_AUDIO_MUSIC,          -1);
+	// Audio: all on by default (except music — BGM replaces it)
+	SetRegValue(REG_KEY_AUDIO_EFFECT,         1);
+	SetRegValue(REG_KEY_AUDIO_AMBIENT,        1);
+	SetRegValue(REG_KEY_AUDIO_VOICEOVER,      1);
+	SetRegValue(REG_KEY_AUDIO_MUSIC,          0);
 	SetRegValue(REG_KEY_AUDIO_SUBTITLES,      0);
-	SetRegValue(REG_KEY_AUDIO_ENABLE3D,       -1);
+	SetRegValue(REG_KEY_AUDIO_ENABLE3D,       1);
 
-	// Background music
-	SetRegValue("EnableBackgroundMusic",       1);
+	// Trespasser-Plus section
+	SetModValue("EnableBackgroundMusic",        1);
+	SetModValue(REG_KEY_SHUFFLE,              DEFAULT_SHUFFLE);
+	SetModValue(REG_KEY_HARDCORE,             DEFAULT_HARDCORE);
+	SetModValue(REG_KEY_LOGGING,             DEFAULT_LOGGING);
 
 	// Gameplay
 	SetRegValue(REG_KEY_GORE,                 3);
 	SetRegValue(REG_KEY_INVERTMOUSE,          0);
-	SetRegValue(REG_KEY_DIFFICULTY,           DEFAULT_DIFFICULTY);
 	SetRegValue(REG_KEY_VIEWPORT_X,           0);
 	SetRegValue(REG_KEY_VIEWPORT_Y,           0);
 
@@ -133,9 +136,9 @@ void CloseKey(BOOL b_change_safemode)
 	WritePrivateProfileString(NULL, NULL, NULL, g_szConfigPath);
 }
 
-int GetDifficulty()
+bool IsHardcore()
 {
-	return GetRegValue(REG_KEY_DIFFICULTY, DEFAULT_DIFFICULTY);
+	return GetModValue(REG_KEY_HARDCORE, DEFAULT_HARDCORE) != 0;
 }
 
 // --- Integer values ---
@@ -248,4 +251,16 @@ float GetRegFloat(LPCSTR lpszVal, float fDefault)
 void DeleteValue(LPCSTR lpszVal)
 {
 	WritePrivateProfileString(g_pszIniSection, lpszVal, NULL, g_szConfigPath);
+}
+
+void SetModValue(LPCSTR lpszVal, int nVal)
+{
+	char szVal[32];
+	wsprintf(szVal, "%d", nVal);
+	WritePrivateProfileString(g_pszModSection, lpszVal, szVal, g_szConfigPath);
+}
+
+int GetModValue(LPCSTR lpszVal, int nDefault)
+{
+	return GetPrivateProfileInt(g_pszModSection, lpszVal, nDefault, g_szConfigPath);
 }

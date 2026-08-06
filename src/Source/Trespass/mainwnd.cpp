@@ -637,13 +637,24 @@ void CMainWnd::GameLoop()
         switch(i)
         {
             case 1:
-				// Stop level BGM, try to play menu music
-				g_BackgroundMusic.Stop();
-				if (GetRegValue("EnableBackgroundMusic", 1))
+			// Stop level BGM, try to play menu music
+			g_BackgroundMusic.Stop();
+			if (GetModValue("EnableBackgroundMusic", 1))
+			{
+				char szBase[_MAX_PATH];
+				GetRegString(REG_KEY_DATA_DRIVE, szBase, sizeof(szBase), "");
+
+				// Try menu.m3u first, then single files
+				char szPath[_MAX_PATH];
+				lstrcpy(szPath, szBase);
+				lstrcat(szPath, "data\\menu.m3u");
+				if (GetFileAttributes(szPath) != 0xFFFFFFFF)
+				{
+					g_BackgroundMusic.Play(szPath);
+				}
+				else
 				{
 					static const char* menuExts[] = { ".adx", ".wav", ".cau" };
-					char szBase[_MAX_PATH];
-					GetRegString(REG_KEY_DATA_DRIVE, szBase, sizeof(szBase), "");
 					for (int me = 0; me < 3; me++)
 					{
 						char szMenu[_MAX_PATH];
@@ -654,6 +665,7 @@ void CMainWnd::GameLoop()
 							break;
 					}
 				}
+			}
                 puiwnd = new CMainScreenWnd(m_pUIMgr);
                 break;
 

@@ -21,6 +21,7 @@ extern HWND		    g_hwnd;
 extern CMainWnd *   g_pMainWnd;
 
 CTPassGlobals               g_CTPassGlobals;
+char                        g_szCurrentLevelBase[_MAX_PATH] = "";
 PFNWORLDLOADNOTIFY          g_pfnWorldLoadNotify;
 uint32                      g_u4NotifyParam;
 const float                 g_fMaxPower = 3.0f;
@@ -301,30 +302,15 @@ int CTPassGlobals::LoadLevel(LPCSTR pszName)
 {
     int     iRet;
     char    szFile[_MAX_PATH];
-    char    szMusic[_MAX_PATH];
 
     // BUGBUG:  Hack to get data drive location
     GetRegString(REG_KEY_DATA_DRIVE, szFile, sizeof(szFile), "");
 
-	// Per-level background music: try .cau, .ogg, .wav
-	g_BackgroundMusic.Stop();
-	if (GetRegValue("EnableBackgroundMusic", 1))
+	// Store level base name for BGM to pick up after loading
 	{
-		char szBase[_MAX_PATH];
-		lstrcpy(szBase, pszName);
-		char* pDot = strrchr(szBase, '.');
+		lstrcpy(g_szCurrentLevelBase, pszName);
+		char* pDot = strrchr(g_szCurrentLevelBase, '.');
 		if (pDot) *pDot = '\0';
-
-		static const char* exts[] = { ".cau", ".adx", ".wav" };
-		for (int e = 0; e < 3; e++)
-		{
-			lstrcpy(szMusic, szFile);
-			lstrcat(szMusic, "data\\");
-			lstrcat(szMusic, szBase);
-			lstrcat(szMusic, exts[e]);
-			if (g_BackgroundMusic.Play(szMusic))
-				break;
-		}
 	}
 
     strcat(szFile, "data\\");
@@ -390,6 +376,9 @@ int CTPassGlobals::LoadScene(LPSTR pszScene, LPSTR pszOrigSCN)
 	BOOL b_old_ignore = CUIWnd::bIgnoreSysKey;
 	CUIWnd::bIgnoreSysKey = TRUE;
 
+	// Stop any playing BGM; actual playback starts in gamewnd after load completes
+	g_BackgroundMusic.Stop();
+
     Assert(strlen(pszScene) + 1 < sizeof(char) * _MAX_PATH);
 
     strcpy(m_szLastScene, pszScene);
@@ -397,6 +386,11 @@ int CTPassGlobals::LoadScene(LPSTR pszScene, LPSTR pszOrigSCN)
     if (pszOrigSCN)
     {
         strcpy(m_szSCN, pszOrigSCN);
+        // Store level base name for BGM
+        lstrcpy(g_szCurrentLevelBase, pszOrigSCN);
+        char* pDot = strrchr(g_szCurrentLevelBase, '.');
+        if (pDot) *pDot = '\0';
+        s_bBgmAttempted = false;  // new level, retry BGM
     }
 
     bUseDlg = GetRegValue("ShowProgressBar", TRUE);

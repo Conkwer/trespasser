@@ -85,7 +85,7 @@
 // PREVENT CODE GEN BUG!
 #pragma optimize("g", off)
 
-int GetDifficulty();
+bool IsHardcore();
 
 #ifdef __MWERKS__
  // for != if only given ==
@@ -2099,7 +2099,7 @@ private:
 		}
 
 		// Hardcore: Anne takes extra damage, scaled by attacker revive count.
-		if (GetDifficulty() >= 3 && f_damage > 0.0f)
+		if (IsHardcore() && f_damage > 0.0f)
 		{
 			float fExtra = f_damage * 0.5f;
 			// Additional scaling if attacker is a revived dino.
@@ -2272,7 +2272,7 @@ private:
 	{
 		// Invoke base class message handling.
 		// At difficulty 3, prevent passive HP regen (except in water).
-		if (GetDifficulty() >= 3)
+		if (IsHardcore())
 		{
 			float fSavedRegen = fRegenerationRate;
 			if (IsPlayerInWater())
