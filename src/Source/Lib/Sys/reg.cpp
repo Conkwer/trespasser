@@ -94,6 +94,7 @@ static void WriteDefaults()
 	SetModValue(REG_KEY_RANDOMIZATION,       DEFAULT_RANDOMIZATION);
 	SetModValue(REG_KEY_TUTORIALS,           DEFAULT_TUTORIALS);
 	SetModValue(REG_KEY_DEBUG,               DEFAULT_DEBUG);
+	SetModString(REG_KEY_LANGUAGE,           DEFAULT_LANGUAGE);
 
 	// Gameplay
 	SetRegValue(REG_KEY_GORE,                 3);
@@ -298,4 +299,14 @@ void SetModValue(LPCSTR lpszVal, int nVal)
 int GetModValue(LPCSTR lpszVal, int nDefault)
 {
 	return GetPrivateProfileInt(g_pszModSection, lpszVal, nDefault, g_szConfigPath);
+}
+
+void SetModString(LPCSTR lpszVal, LPCSTR lpszString)
+{
+	WritePrivateProfileString(g_pszModSection, lpszVal, lpszString, g_szConfigPath);
+}
+
+int GetModString(LPCSTR lpszVal, LPSTR lpszString, int nSize, LPCSTR lpszDefault)
+{
+	return GetPrivateProfileString(g_pszModSection, lpszVal, lpszDefault, lpszString, nSize, g_szConfigPath);
 }

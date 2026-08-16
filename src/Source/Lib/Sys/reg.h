@@ -14,6 +14,8 @@ void  SetRegFloat(LPCSTR lpszVal, float fVal);
 float GetRegFloat(LPCSTR lpszVal, float fDefault);
 void  SetModValue(LPCSTR lpszVal, int nVal);
 int   GetModValue(LPCSTR lpszVal, int nDefault);
+void  SetModString(LPCSTR lpszVal, LPCSTR lpszString);
+int   GetModString(LPCSTR lpszVal, LPSTR lpszString, int nSize, LPCSTR lpszDefault);
 extern BOOL bSafeModeReg;
 
 void DisableSafemode();

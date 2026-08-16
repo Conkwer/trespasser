@@ -446,9 +446,18 @@ public:
 	//******************************************************************************************
 	// Return the full path of a loose override file (override\<base>\<name>.cau/.wav/.adx)
 	// whose hash matches the given sound handle, or NULL if there is no override.
-	// The path is in the database name's case; the file system is case insensitive on Windows.
+	// Language specific overrides (e.g. <name>.Ru.wav with Language=Ru) take priority
+	// over generic ones.
 	const char* pstrFindOverride(TSoundHandle sndhnd)
 	{
+		if (strLanguage[0])
+		{
+			TOverrideHash::iterator i = ohOverridesLang.find(sndhnd);
+
+			if (i != ohOverridesLang.end())
+				return (*i).second;
+		}
+
 		TOverrideHash::iterator i = ohOverrides.find(sndhnd);
 
 		if (i == ohOverrides.end())
@@ -459,9 +468,17 @@ public:
 
 	//******************************************************************************************
 	// Return the full path of a loose .srt subtitle override for the given sound handle
-	// or NULL if there is no override.
+	// or NULL if there is no override. Language specific files take priority.
 	const char* pstrFindSrtOverride(TSoundHandle sndhnd)
 	{
+		if (strLanguage[0])
+		{
+			TOverrideHash::iterator i = ohSrtOverridesLang.find(sndhnd);
+
+			if (i != ohSrtOverridesLang.end())
+				return (*i).second;
+		}
+
 		TOverrideHash::iterator i = ohSrtOverrides.find(sndhnd);
 
 		if (i == ohSrtOverrides.end())
@@ -500,8 +517,11 @@ protected:
 	SAudioCollision*		acolCollisions;
 
 	char					strBaseName[64];		// packed file name without path or extension
+	char					strLanguage[16];		// configured language suffix, e.g. "Ru"
 	TOverrideHash			ohOverrides;			// hash -> path of loose audio overrides
+	TOverrideHash			ohOverridesLang;		// language specific audio overrides
 	TOverrideHash			ohSrtOverrides;			// hash -> path of loose .srt overrides
+	TOverrideHash			ohSrtOverridesLang;		// language specific .srt overrides
 
 	HANDLE					hDatabase;			// file handle if sharing or NULL
 	uint32					u4HandleCount;		// number of handles in the array below

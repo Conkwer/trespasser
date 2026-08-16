@@ -141,6 +141,9 @@
 #include "AudioADPCM.hpp"
 #include "AudioVOICE.hpp"
 
+#include "Lib/Sys/reg.h"
+#include "Lib/Sys/RegInit.hpp"
+
 #include <math.h>
 
 
@@ -1660,7 +1663,17 @@ CAudioDatabase::~CAudioDatabase
 		delete[] (*it).second;
 	}
 
+	for (it = ohOverridesLang.begin(); it != ohOverridesLang.end(); ++it)
+	{
+		delete[] (*it).second;
+	}
+
 	for (it = ohSrtOverrides.begin(); it != ohSrtOverrides.end(); ++it)
+	{
+		delete[] (*it).second;
+	}
+
+	for (it = ohSrtOverridesLang.begin(); it != ohSrtOverridesLang.end(); ++it)
 	{
 		delete[] (*it).second;
 	}
@@ -1758,6 +1771,23 @@ void CAudioDatabase::StoreBaseName
 		memcpy(strBaseName, pstr_base, u4_base_len);
 		strBaseName[u4_base_len] = 0;
 	}
+
+	//
+	// Load the configured language suffix (e.g. "Ru") so that language specific
+	// override files (<name>.Ru.srt) take priority over generic ones.
+	//
+	GetModString(REG_KEY_LANGUAGE, strLanguage, sizeof(strLanguage), "");
+
+	if (strLanguage[0])
+	{
+		char*	pstr = strLanguage;
+
+		while (*pstr)
+		{
+			*pstr = (char)tolower(*pstr);
+			pstr++;
+		}
+	}
 }
 
 
@@ -1825,13 +1855,66 @@ void CAudioDatabase::ScanOverrideDirectory
 			char*	pstr_path = new char[_MAX_PATH];
 			wsprintf(pstr_path, "override\\%s\\%s", strBaseName, ffd.cFileName);
 
+			// Language support: a file named <name>.<Lang>.ext (e.g. VA39.Ru.srt)
+			// overrides the sample for the configured language only. The base name
+			// is also registered so that a generic file with the same name loses.
+			bool	b_lang = false;
+			uint32	u4_name_len = (uint32)strlen(asz_name);
+			uint32	u4_lang_len = (uint32)strlen(strLanguage);
+
+			if (strLanguage[0] &&
+				u4_name_len > u4_lang_len + 1 &&
+				asz_name[u4_name_len - u4_lang_len - 1] == '.' &&
+				stricmp(asz_name + u4_name_len - u4_lang_len, strLanguage) == 0)
+			{
+				b_lang = true;
+			}
+
 			if (u4 == 3)
 			{
-				ohSrtOverrides[u4_hash] = pstr_path;
+				if (b_lang)
+				{
+					ohSrtOverridesLang[u4_hash] = pstr_path;
+
+					// register the base name in the language map as well so that
+					// it takes priority over a generic <name>.srt file
+					asz_name[u4_name_len - u4_lang_len - 1] = 0;
+
+					uint32	u4_hash_base = sndhndHashIdentifier(asz_name);
+
+					if (u4_hash_base != 0 && u4_hash_base != u4_hash)
+					{
+						char*	pstr_path2 = new char[_MAX_PATH];
+						strcpy(pstr_path2, pstr_path);
+						ohSrtOverridesLang[u4_hash_base] = pstr_path2;
+					}
+				}
+				else
+				{
+					ohSrtOverrides[u4_hash] = pstr_path;
+				}
 			}
 			else
 			{
-				ohOverrides[u4_hash] = pstr_path;
+				if (b_lang)
+				{
+					ohOverridesLang[u4_hash] = pstr_path;
+
+					asz_name[u4_name_len - u4_lang_len - 1] = 0;
+
+					uint32	u4_hash_base = sndhndHashIdentifier(asz_name);
+
+					if (u4_hash_base != 0 && u4_hash_base != u4_hash)
+					{
+						char*	pstr_path2 = new char[_MAX_PATH];
+						strcpy(pstr_path2, pstr_path);
+						ohOverridesLang[u4_hash_base] = pstr_path2;
+					}
+				}
+				else
+				{
+					ohOverrides[u4_hash] = pstr_path;
+				}
 			}
 		}
 		while (FindNextFile(h_find, &ffd));
