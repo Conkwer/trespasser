@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1998
+ * Copyright ï¿½ DreamWorks Interactive. 1998
  *
  * Contents:
  *		CDDFont
@@ -119,6 +119,17 @@ public:
 
 
 	//******************************************************************************************
+	// Print a UTF-8 string with the TTF font (HackGenConsoleNF-Regular.ttf if present,
+	// otherwise the regular GDI font). The text is word wrapped, centered and anchored
+	// to the bottom or top of the screen depending on the formatting flags.
+	void PrintUTF8String
+	(
+		const char*	str_utf8,
+		uint32		u4_flags
+	);
+
+
+	//******************************************************************************************
 	uint32 u4FormattedStringBytes
 	(
 		uint8*	pu1_data
@@ -147,7 +158,12 @@ public:
 	}
 
 protected:
+	// Load HackGenConsoleNF-Regular.ttf (searched in the game, data and override
+	// directories) and create a font from it. Falls back to the regular GDI font.
+	void* LoadTTFFont(int32 i4_size);
+
 	void*			hfont;
+	void*			hfontTTF;			// Unicode TTF font for UTF-8 text, NULL if not loaded
 	bool			bFill;
 	uint32			u4Colour;			// same as a COLORREF not a CColour
 	int32			i4YHeight;

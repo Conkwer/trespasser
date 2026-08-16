@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright ï¿½ DreamWorks Interactive. 1997
  *
  * Contents:
  *	Audio classes:
@@ -1160,6 +1160,9 @@ public:
 	LPDIRECTSOUNDBUFFER		pDSBuffer;		// directSound interface
 	LPDIRECTSOUND3DBUFFER	pDS3DBuffer;	// 3d interface, NULL if not 3D
 	CAudioSubtitle*			pasubSubtitle;	// pointer to the sub title or NULL
+
+	char*					strSrtOverride;	// path of an override .srt subtitle file or NULL
+	bool					bSrtSetup;		// the srt subtitles have been scheduled
 
 	uint8*					pu1Lock1;		// base address of first half of lock
 	uint8*					pu1Lock2;		// base address of second half of lock

@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright ï¿½ DreamWorks Interactive. 1997
  *
  * Contents:
  *	CAudioDaemon implementation
@@ -2838,6 +2838,17 @@ void CAudioDaemon::ProcessSubtitle
 {
 	Assert(psam);
 
+	// An override .srt file takes priority over the subtitles embedded in the CAU.
+	if (psam->strSrtOverride)
+	{
+		if (psam->bSrtSetup)
+			return;
+
+		psam->bSrtSetup = true;
+		ProcessSrtSubtitle(psam->strSrtOverride);
+		return;
+	}
+
 	// this sample has no subtitle...
 	if (psam->pasubSubtitle == NULL)
 		return;
@@ -2892,6 +2903,258 @@ void CAudioDaemon::ProcessSubtitle
 
 		u4_sect--;
 	}
+}
+
+
+//**********************************************************************************************
+// Parse an .srt subtitle file and schedule all of its lines on the text overlay system.
+// SRT times are relative to the start of the voice over.
+//
+void CAudioDaemon::ProcessSrtSubtitle
+(
+	const char*	str_path
+)
+//*************************************
+{
+	HANDLE	h_file = CreateFile( str_path, GENERIC_READ, FILE_SHARE_READ, NULL,
+                                OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0 );
+
+	if (h_file == INVALID_HANDLE_VALUE)
+	{
+		dprintf("Open subtitle file '%s' failed\n", str_path);
+		return;
+	}
+
+	DWORD	u4_size = GetFileSize(h_file, NULL);
+
+	if (u4_size == 0 || u4_size > 256*1024)
+	{
+		CloseHandle(h_file);
+		return;
+	}
+
+	char*	pstr_buf = new char[u4_size + 1];
+	DWORD	u4_read = 0;
+
+	if (ReadFile(h_file, pstr_buf, u4_size, &u4_read, NULL) == false)
+	{
+		delete pstr_buf;
+		CloseHandle(h_file);
+		return;
+	}
+
+	CloseHandle(h_file);
+
+	pstr_buf[u4_read]		= 0;
+	pstr_buf[u4_size]		= 0;
+
+	char*	p = pstr_buf;
+
+	// skip a UTF-8 byte order mark if there is one
+	if ((uint8)p[0] == 0xEF && (uint8)p[1] == 0xBB && (uint8)p[2] == 0xBF)
+	{
+		p += 3;
+	}
+
+	while (*p)
+	{
+		// skip blank lines and the entry index line
+		while (*p == '\r' || *p == '\n')
+		{
+			p++;
+		}
+
+		if (!*p)
+		{
+			break;
+		}
+
+		// the current line should be the entry number, skip it
+		while (*p && *p != '\r' && *p != '\n')
+		{
+			p++;
+		}
+
+		while (*p == '\r' || *p == '\n')
+		{
+			p++;
+		}
+
+		if (!*p)
+		{
+			break;
+		}
+
+		// parse the timing line: HH:MM:SS,mmm --> HH:MM:SS,mmm
+		int32	i4_h1, i4_m1, i4_s1, i4_ms1;
+		int32	i4_h2, i4_m2, i4_s2, i4_ms2;
+
+		if (sscanf(p, "%d:%d:%d,%d --> %d:%d:%d,%d",
+					&i4_h1, &i4_m1, &i4_s1, &i4_ms1,
+					&i4_h2, &i4_m2, &i4_s2, &i4_ms2) != 8)
+		{
+			break;
+		}
+
+		TSec	s_start	= (TSec)(i4_h1 * 3600 + i4_m1 * 60 + i4_s1) + (TSec)i4_ms1 / 1000.0f;
+		TSec	s_end	= (TSec)(i4_h2 * 3600 + i4_m2 * 60 + i4_s2) + (TSec)i4_ms2 / 1000.0f;
+
+		// skip to the end of the timing line
+		while (*p && *p != '\r' && *p != '\n')
+		{
+			p++;
+		}
+
+		//
+		// Collect the text lines for this entry, they run until a blank line or until
+		// the header of the next entry (a number followed by a timing line).
+		//
+		char	asz_text[2048];
+		uint32	u4_text_len = 0;
+		bool	b_valid = false;
+
+		asz_text[0] = 0;
+
+		while (*p)
+		{
+			while (*p == '\r' || *p == '\n')
+			{
+				p++;
+			}
+
+			if (!*p)
+			{
+				break;
+			}
+
+			// remember the start of this line so we can rewind if it is the next header
+			char*	pstr_line = p;
+			uint32	u4_line_len = 0;
+
+			while (p[u4_line_len] && p[u4_line_len] != '\r' && p[u4_line_len] != '\n')
+			{
+				u4_line_len++;
+			}
+
+			// does this line look like the next entry's timing line?
+			int32	i4_t1, i4_t2, i4_t3, i4_t4, i4_t5, i4_t6, i4_t7, i4_t8;
+
+			if (sscanf(p, "%d:%d:%d,%d --> %d:%d:%d,%d",
+						&i4_t1, &i4_t2, &i4_t3, &i4_t4,
+						&i4_t5, &i4_t6, &i4_t7, &i4_t8) == 8)
+			{
+				// this is the next entry, rewind and finish this one
+				p = pstr_line;
+				break;
+			}
+
+			// copy the line into the text buffer, stripping any tags <...>
+			uint32	u4_src = 0;
+
+			while (u4_src < u4_line_len)
+			{
+				if (p[u4_src] == '<')
+				{
+					// skip the tag
+					while (u4_src < u4_line_len && p[u4_src] != '>')
+					{
+						u4_src++;
+					}
+
+					u4_src++;
+				}
+				else
+				{
+					if (u4_text_len < sizeof(asz_text) - 1)
+					{
+						asz_text[u4_text_len++] = p[u4_src];
+					}
+
+					u4_src++;
+				}
+			}
+
+			asz_text[u4_text_len] = 0;
+
+			// advance past the line
+			p += u4_line_len;
+
+			if (u4_text_len > 0)
+			{
+				b_valid = true;
+			}
+
+			// was this line the last one of the entry?
+			char*	pstr_next = p;
+
+			while (*pstr_next == '\r' || *pstr_next == '\n')
+			{
+				pstr_next++;
+			}
+
+			if (!*pstr_next)
+			{
+				break;
+			}
+
+			// does the next line start a new entry? (a pure number line whose following
+			// line is a timing line)
+			char	asz_peek[32];
+			uint32	u4_peek = 0;
+
+			while (pstr_next[u4_peek] && pstr_next[u4_peek] != '\r' && pstr_next[u4_peek] != '\n' && u4_peek < sizeof(asz_peek) - 1)
+			{
+				asz_peek[u4_peek] = pstr_next[u4_peek];
+				u4_peek++;
+			}
+
+			asz_peek[u4_peek] = 0;
+
+			uint32	u4_digits = 0;
+
+			while (asz_peek[u4_digits] >= '0' && asz_peek[u4_digits] <= '9')
+			{
+				u4_digits++;
+			}
+
+			if (u4_digits > 0 && u4_digits == u4_peek)
+			{
+				// all digits: check that the line after it is a timing line before
+				// treating it as the next entry's index line
+				char*	pstr_after = pstr_next + u4_peek;
+
+				while (*pstr_after == '\r' || *pstr_after == '\n')
+				{
+					pstr_after++;
+				}
+
+				int32	i4_a1, i4_a2, i4_a3, i4_a4, i4_a5, i4_a6, i4_a7, i4_a8;
+
+				if (sscanf(pstr_after, "%d:%d:%d,%d --> %d:%d:%d,%d",
+							&i4_a1, &i4_a2, &i4_a3, &i4_a4,
+							&i4_a5, &i4_a6, &i4_a7, &i4_a8) == 8)
+				{
+					// this is the next entry's index line
+					break;
+				}
+			}
+
+			// otherwise the next line is more text for this entry
+			if (u4_text_len < sizeof(asz_text) - 1)
+			{
+				asz_text[u4_text_len++] = '\n';
+			}
+		}
+
+		if (b_valid && s_end > s_start)
+		{
+			CTextOverlay::ptovTextSystem->u4DisplayUTF8String(asz_text, s_start, s_end,
+									TEXT_FORMAT_BOTTOM | TEXT_FORMAT_CENTER,
+									CColour(255,255,255), ettSUBTITLE);
+		}
+	}
+
+	delete pstr_buf;
 }
 
 
@@ -3452,8 +3715,8 @@ void CAudioDaemon::CloseAudioDatabases
 
 
 //**********************************************************************************************
-// Create a database from the specified file, it will first look locally and the it will
-// look on M:
+// Create a database from the specified file, it will first look in the override directory,
+// then locally and finally on the data path.
 CAudioDatabase* CAudioDaemon::OpenDatabase
 (
 	const char*	str_name,
@@ -3463,22 +3726,33 @@ CAudioDatabase* CAudioDaemon::OpenDatabase
 {
 	char   str_path[MAX_PATH];
     const char * str_file = str_name;
+
 	//
-	// Look for the specified file...
+	// Look for the specified file... first in override\, then next to the exe and
+	// finally in the data directory.
 	//
+	strcpy(str_path, "override\\");
+	strcat(str_path, str_name);
+	str_file = str_path;
+
 	if (!bFileExists(str_file))
 	{
-		// if we do not find it, path a netwrok filename and look for that
-        strcpy(str_path, str_DataPath);
-		//strcpy(str_path,"A:\\");
-		strcat(str_path,str_name);
-		str_file = str_path;
+		str_file = str_name;
 
-		// if we still do not find it it must not exist
 		if (!bFileExists(str_file))
 		{
-			// return no database
-			return NULL;
+			// if we do not find it, path a netwrok filename and look for that
+			strcpy(str_path, str_DataPath);
+			//strcpy(str_path,"A:\\");
+			strcat(str_path,str_name);
+			str_file = str_path;
+
+			// if we still do not find it it must not exist
+			if (!bFileExists(str_file))
+			{
+				// return no database
+				return NULL;
+			}
 		}
 	}
 

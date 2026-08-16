@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright ï¿½ DreamWorks Interactive. 1997
  *
  * Contents:
  *		CSample 
@@ -164,6 +164,8 @@ CSample::CSample
 	pDSBuffer				= NULL;
 	pDS3DBuffer				= NULL;
 	pasubSubtitle			= NULL;
+	strSrtOverride			= NULL;
+	bSrtSetup				= false;
 	u4CreateFlags			= u4_flags;
 	u4Length				= 0;
 	fMasterVolume			= 0.0f;
@@ -347,10 +349,13 @@ CSample::CSample
 CSample::CSample
 (
 )
-//	
+//
 //**************************************
 {
-	MEMLOG_ADD_COUNTER(emlSoundControl,sizeof(CSample));	
+	MEMLOG_ADD_COUNTER(emlSoundControl,sizeof(CSample));
+
+	strSrtOverride	= NULL;
+	bSrtSetup		= false;
 }
 
 
@@ -416,6 +421,8 @@ CSample::~CSample
 
 	// we delete the subtitle even if there is no audio buffer
 	delete pasubSubtitle;
+
+	delete strSrtOverride;
 }
 
 
@@ -980,6 +987,19 @@ CSample* CSample::psamCreateInstance
 	{
 		psam_new->pasubSubtitle = NULL;
 	}
+
+	// copy the srt override path if there is one
+	if (strSrtOverride)
+	{
+		psam_new->strSrtOverride	= new char[ strlen(strSrtOverride)+1 ];
+		strcpy(psam_new->strSrtOverride, strSrtOverride);
+	}
+	else
+	{
+		psam_new->strSrtOverride = NULL;
+	}
+
+	psam_new->bSrtSetup = false;
 
 	// not instanced data..
 	psam_new->fVolume			= 0.0f;		// default max volume

@@ -1,6 +1,6 @@
 /**********************************************************************************************
  *
- * Copyright © DreamWorks Interactive, 1996
+ * Copyright ï¿½ DreamWorks Interactive, 1996
  *
  * Contents:
  *		Definition CTextOverlay
@@ -48,6 +48,8 @@ extern uint32 u4LookupResourceString(int32 id,char* str_buf,uint32 u4_buf_len);
 #define TEXT_FORMAT_RAW		0x00000100
 #define TEXT_FORMAT_SOLID	0x00000200
 #define TEXT_FORMAT_IGNORE	0x00000400
+#define TEXT_FORMAT_TIMED	0x00000800
+#define TEXT_FORMAT_UTF8	0x00001000
 
 //**********************************************************************************************
 enum ETextType
@@ -64,6 +66,7 @@ enum ETextType
 struct STextElement
 {
 	TSec	sRemove;
+	TSec	sRemove2;							// removal time for TEXT_FORMAT_TIMED lines
 	union
 	{
 		uint8*		pu1FormattedData;			// either a pointer to formatted data
@@ -130,6 +133,19 @@ public:
 		CColour		clr,				// colour
 		uint32		u4_prev = 0,
 		ETextType	ett = ettUNKNOWN
+	);
+
+	//*****************************************************************************************
+	// Display a UTF-8 encoded string (e.g. an SRT subtitle line) using the TTF font.
+	// The line becomes visible at s_start seconds and is removed at s_end seconds.
+	uint32 u4DisplayUTF8String
+	(
+		char*		str_text,			// UTF-8 C style text string
+		TSec		s_start,			// time from now to display the line
+		TSec		s_end,				// time from now to remove the line
+		uint32		u4_flags,			// formatting flags
+		CColour		clr,				// colour of the text
+		ETextType	ett = ettSUBTITLE
 	);
 
 	//*****************************************************************************************

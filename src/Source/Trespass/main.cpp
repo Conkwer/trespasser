@@ -343,6 +343,11 @@ void TrespassExceptionCleanup()
 
 bool ValidateDiskSpace(int iMB)
 {
+    // Disabled: the check misfires on shared folders and network volumes where
+    // GetDiskFreeSpace reports bogus values (e.g. running the game from a
+    // VirtualBox shared folder). Always allow startup.
+    return true;
+#if 0
     bool                bRet;
     char                szPath[_MAX_PATH];
     char                szDrive[_MAX_PATH];
@@ -364,7 +369,7 @@ bool ValidateDiskSpace(int iMB)
                                   &dwTotalClusters);
     if (!bRet)
     {
-        Trace(("ValidateDiskSpace() -- GetFreeDiskSpace error %i", 
+        Trace(("ValidateDiskSpace() -- GetFreeDiskSpace error %i",
                GetLastError()));
 		return true;
     }
@@ -385,13 +390,14 @@ bool ValidateDiskSpace(int iMB)
 	Trace(("%s  %s\r\n%i %i %i %i\r\n%i", szDrive, szPath,
 		dwSectorsPerCluster, dwBytesPerSector, dwFreeClusters, dwTotalClusters, dwTotalSize));
     // Check for enough free space for a save
-    if ((dwSectorsPerCluster * dwBytesPerSector * dwFreeClusters) + dwTotalSize < 
+    if ((dwSectorsPerCluster * dwBytesPerSector * dwFreeClusters) + dwTotalSize <
         iMB * 1024 * 1024)
     {
         bRet = false;
     }
 
     return bRet;
+#endif
 }
 
 

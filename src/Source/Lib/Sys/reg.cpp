@@ -5,6 +5,7 @@
 #include "Reg.h"
 #include "RegInit.hpp"
 #include "IniFile.hpp"
+#include "DebugConsole.hpp"
 
 #define REGKEYPARENT HKEY_LOCAL_MACHINE
 #ifndef DEMO_BUILD
@@ -91,6 +92,8 @@ static void WriteDefaults()
 	SetModValue(REG_KEY_HARDCORE,             DEFAULT_HARDCORE);
 	SetModValue(REG_KEY_LOGGING,             DEFAULT_LOGGING);
 	SetModValue(REG_KEY_RANDOMIZATION,       DEFAULT_RANDOMIZATION);
+	SetModValue(REG_KEY_TUTORIALS,           DEFAULT_TUTORIALS);
+	SetModValue(REG_KEY_DEBUG,               DEFAULT_DEBUG);
 
 	// Gameplay
 	SetRegValue(REG_KEY_GORE,                 3);
@@ -152,6 +155,9 @@ void OpenKey()
 	// Get ready for safe mode.
 	bSafeModeReg = GetRegValue(REG_KEY_SAFEMODE, FALSE) ? true : false;
 	SetRegValue(REG_KEY_SAFEMODE, TRUE);
+
+	// Enable or disable the debug log file based on the config.
+	bDebugLogFile = GetModValue(REG_KEY_DEBUG, DEFAULT_DEBUG) != 0;
 }
 
 void CloseKey(BOOL b_change_safemode)

@@ -532,24 +532,39 @@ void CBackgroundMusic::PlayNextPlaylistTrack()
 }
 
 // Try to play a single file or M3U playlist for a level.
-// Priority: %level%.m3u > trespasser.m3u > single file (.cau/.adx/.wav)
+// Priority: override\data\... > data\...
+// %level%.m3u > trespasser.m3u > single file (.cau/.adx/.wav)
 bool CBackgroundMusic::PlayLevelTrack(const char* pszLevelBase)
 {
 	char szPath[_MAX_PATH];
-	char szBase[_MAX_PATH];
+	char szData[_MAX_PATH];
+	char szOverride[_MAX_PATH];
 
-	GetRegString(REG_KEY_DATA_DRIVE, szBase, sizeof(szBase), ".\\");
-	strcat(szBase, "data\\");
+	GetRegString(REG_KEY_DATA_DRIVE, szData, sizeof(szData), ".\\");
+	strcat(szData, "data\\");
+	GetRegString(REG_KEY_DATA_DRIVE, szOverride, sizeof(szOverride), ".\\");
+	strcat(szOverride, "override\\data\\");
 
 	// 1) Per-level playlist: %level%.m3u
-	lstrcpy(szPath, szBase);
+	lstrcpy(szPath, szOverride);
+	lstrcat(szPath, pszLevelBase);
+	lstrcat(szPath, ".m3u");
+	if (GetFileAttributes(szPath) != 0xFFFFFFFF)
+		return Play(szPath);
+
+	lstrcpy(szPath, szData);
 	lstrcat(szPath, pszLevelBase);
 	lstrcat(szPath, ".m3u");
 	if (GetFileAttributes(szPath) != 0xFFFFFFFF)
 		return Play(szPath);
 
 	// 2) Global playlist: trespass.m3u
-	lstrcpy(szPath, szBase);
+	lstrcpy(szPath, szOverride);
+	lstrcat(szPath, "trespass.m3u");
+	if (GetFileAttributes(szPath) != 0xFFFFFFFF)
+		return Play(szPath);
+
+	lstrcpy(szPath, szData);
 	lstrcat(szPath, "trespass.m3u");
 	if (GetFileAttributes(szPath) != 0xFFFFFFFF)
 		return Play(szPath);
@@ -558,7 +573,13 @@ bool CBackgroundMusic::PlayLevelTrack(const char* pszLevelBase)
 	static const char* exts[] = { ".cau", ".adx", ".wav" };
 	for (int e = 0; e < 3; e++)
 	{
-		lstrcpy(szPath, szBase);
+		lstrcpy(szPath, szOverride);
+		lstrcat(szPath, pszLevelBase);
+		lstrcat(szPath, exts[e]);
+		if (Play(szPath))
+			return true;
+
+		lstrcpy(szPath, szData);
 		lstrcat(szPath, pszLevelBase);
 		lstrcat(szPath, exts[e]);
 		if (Play(szPath))

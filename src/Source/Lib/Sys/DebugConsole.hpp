@@ -1,6 +1,6 @@
 /**********************************************************************************************
  *
- * Copyright © DreamWorks Interactive, 1997
+ * Copyright ï¿½ DreamWorks Interactive, 1997
  *
  * Contents:
  *
@@ -176,6 +176,9 @@ extern nullstream dout;
 
 // #if VER_TEST #else
 #endif
+
+// Write the debug log file? Set to false when Debug=0 in the config file.
+extern bool	bDebugLogFile;
 
 
 //**********************************************************************************************

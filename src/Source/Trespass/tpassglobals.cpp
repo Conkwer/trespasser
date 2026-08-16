@@ -18,6 +18,7 @@
 #include "..\Lib\EntityDBase\PhysicsInfo.hpp"
 #include "..\Game\AI\AIMain.hpp"
 #include "..\Game\AI\Brain.hpp"
+#include "..\Lib\Sys\FileEx.hpp"
 
 
 extern HINSTANCE    g_hInst;
@@ -442,6 +443,21 @@ int CTPassGlobals::LoadLevel(LPCSTR pszName)
     strcat(szFile, "data\\");
     strcat(szFile, pszName);
 
+	// Override directory support: if the level file exists in override\data\ then
+	// load that copy instead of the original.
+	{
+		char	szOverride[_MAX_PATH];
+
+		GetRegString(REG_KEY_DATA_DRIVE, szOverride, sizeof(szOverride), "");
+		strcat(szOverride, "override\\data\\");
+		strcat(szOverride, pszName);
+
+		if (bFileExists(szOverride))
+		{
+			lstrcpy(szFile, szOverride);
+		}
+	}
+
     iRet = LoadScene(szFile, (LPSTR)pszName);
 
 	// Relocate animals matching .loc entries (after level is loaded)
@@ -779,7 +795,23 @@ void CTPassGlobals::CreateMenuAudioDatabase()
     char        szFile[_MAX_PATH];
 
     GetFileLoc(FA_INSTALLDIR, szFile, sizeof(szFile));
-    strcat(szFile, "menu.tpa");
+
+	// Override directory support: prefer override\menu.tpa if it exists.
+	{
+		char	szOverride[_MAX_PATH];
+
+		lstrcpy(szOverride, szFile);
+		strcat(szOverride, "override\\menu.tpa");
+
+		if (bFileExists(szOverride))
+		{
+			lstrcpy(szFile, szOverride);
+		}
+		else
+		{
+			strcat(szFile, "menu.tpa");
+		}
+	}
 
     m_padbMenu = new CAudioDatabase(szFile);
 

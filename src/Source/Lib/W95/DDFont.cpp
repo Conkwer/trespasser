@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1998
+ * Copyright ï¿½ DreamWorks Interactive. 1998
  *
  * Contents:
  *		Implementation of CDDFont
@@ -37,6 +37,30 @@
 extern rptr<CRasterWin> prasMainScreen;
 
 
+// AddFontResourceExW was introduced in the Win2000 SDK so it is not declared in the
+// VC6 headers; resolve it at run time (the game runs on XP or later where it exists).
+#define FR_PRIVATE		0x10
+
+typedef int (WINAPI * PFNADDFONTRESOURCEEXW)(LPCWSTR, DWORD, PVOID);
+
+static PFNADDFONTRESOURCEEXW pfnAddFontResourceExW()
+{
+	static PFNADDFONTRESOURCEEXW pfn = NULL;
+
+	if (pfn == NULL)
+	{
+		HMODULE h_gdi = GetModuleHandle("gdi32.dll");
+
+		if (h_gdi)
+		{
+			pfn = (PFNADDFONTRESOURCEEXW)GetProcAddress(h_gdi, "AddFontResourceExW");
+		}
+	}
+
+	return pfn;
+}
+
+
 //**********************************************************************************************
 //
 CDDFont::CDDFont
@@ -58,6 +82,9 @@ CDDFont::CDDFont
 						DEFAULT_QUALITY,   // NONANTIALIASED_QUALITY - Undocumented
 						VARIABLE_PITCH,
 						"Arial" );
+
+	// load the multilingual TTF font for UTF-8 text (subtitles etc.)
+	hfontTTF = LoadTTFFont(i4_size);
 
 	// get a DC for the screen
 	HDC	hdc_temp = GetDC(NULL);
@@ -102,6 +129,281 @@ CDDFont::~CDDFont
 //*************************************
 {
 	DeleteObject(hfont);
+
+	if (hfontTTF)
+	{
+		DeleteObject(hfontTTF);
+	}
+}
+
+
+//**********************************************************************************************
+// Load HackGenConsoleNF-Regular.ttf from the game, data or override directory, register it
+// with GDI and create a font from it. Returns the font handle or NULL if the file is not
+// present, in which case UTF-8 text falls back to the regular GDI font.
+//
+void* CDDFont::LoadTTFFont
+(
+	int32	i4_size
+)
+//*************************************
+{
+	static const char* asz_paths[] =
+	{
+		"HackGenConsoleNF-Regular.ttf",
+		"data\\HackGenConsoleNF-Regular.ttf",
+		"override\\HackGenConsoleNF-Regular.ttf",
+	};
+
+	uint32	u4;
+	char	asz_found[_MAX_PATH] = "";
+
+	for (u4 = 0; u4 < 3; u4++)
+	{
+		if (GetFileAttributes(asz_paths[u4]) != 0xFFFFFFFF)
+		{
+			lstrcpy(asz_found, asz_paths[u4]);
+			break;
+		}
+	}
+
+	if (asz_found[0] == 0)
+	{
+		return NULL;
+	}
+
+	// register the font with GDI (private to this process)
+	wchar_t	awz_path[_MAX_PATH];
+	MultiByteToWideChar(CP_ACP, 0, asz_found, -1, awz_path, _MAX_PATH);
+
+	PFNADDFONTRESOURCEEXW pfn_add_font = pfnAddFontResourceExW();
+
+	if (pfn_add_font == NULL || pfn_add_font(awz_path, FR_PRIVATE, 0) == 0)
+	{
+		return NULL;
+	}
+
+	//
+	// Read the family name from the TTF name table so we can create a font from it.
+	//
+	HANDLE	h_file = CreateFile(asz_found, GENERIC_READ, FILE_SHARE_READ, NULL,
+								OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0);
+
+	if (h_file == INVALID_HANDLE_VALUE)
+	{
+		return NULL;
+	}
+
+	wchar_t	awz_family[128] = L"";
+	DWORD	u4_bytes;
+
+	// sfnt header: version (4), number of tables (2)
+	uint16	au1_sfnt[3];
+
+	if (ReadFile(h_file, au1_sfnt, 6, &u4_bytes, NULL) && u4_bytes == 6)
+	{
+		uint16	u1_num_tables = au1_sfnt[2];
+
+		// table directory: 16 bytes per table
+		struct STableDir
+		{
+			uint32	u4Tag;
+			uint32	u4Checksum;
+			uint32	u4Offset;
+			uint32	u4Length;
+		};
+
+		uint32	u4_name_off = 0;
+		uint16	u1;
+
+		for (u1 = 0; u1 < u1_num_tables; u1++)
+		{
+			STableDir	td;
+
+			if (!ReadFile(h_file, &td, sizeof(td), &u4_bytes, NULL) || u4_bytes != sizeof(td))
+			{
+				break;
+			}
+
+			if (td.u4Tag == 'name')
+			{
+				u4_name_off = td.u4Offset;
+				break;
+			}
+		}
+
+		if (u4_name_off != 0)
+		{
+			SetFilePointer(h_file, u4_name_off, NULL, FILE_BEGIN);
+
+			uint16	au1_name_hdr[3];	// format, count, stringOffset
+
+			if (ReadFile(h_file, au1_name_hdr, 6, &u4_bytes, NULL) && u4_bytes == 6)
+			{
+				uint16	u1_count = au1_name_hdr[1];
+				uint16	u1_str_off = au1_name_hdr[2];
+
+				uint16	u1_family_rec = 0xFFFF;		// index of the family name record
+				uint16	u1_family_len = 0;
+				uint16	u1_family_off = 0;
+				bool	b_typed = false;			// found a typographic family (id 16)
+
+				for (u1 = 0; u1 < u1_count; u1++)
+				{
+					// record: platform, encoding, language, nameID, length, offset
+					uint16	au1_rec[6];
+
+					if (!ReadFile(h_file, au1_rec, 12, &u4_bytes, NULL) || u4_bytes != 12)
+					{
+						break;
+					}
+
+					// Windows platform only, family (1) or typographic family (16)
+					if (au1_rec[0] != 3 || (au1_rec[3] != 1 && au1_rec[3] != 16))
+					{
+						continue;
+					}
+
+					bool	b_is_typed	= (au1_rec[3] == 16);
+					bool	b_us		= (au1_rec[2] == 0x409);
+
+					// prefer the typographic family and the US english variant
+					if (u1_family_rec == 0xFFFF || (b_is_typed && !b_typed) ||
+						(b_is_typed == b_typed && b_us))
+					{
+						u1_family_rec	= u1;
+						u1_family_len	= au1_rec[4];
+						u1_family_off	= au1_rec[5];
+						b_typed			= b_is_typed;
+					}
+				}
+
+				if (u1_family_rec != 0xFFFF && u1_family_len < sizeof(awz_family))
+				{
+					// the string is UTF-16 big endian, convert it
+					SetFilePointer(h_file, u4_name_off + u1_str_off + u1_family_off, NULL, FILE_BEGIN);
+
+					uint16	au1_str[64];
+
+					if (ReadFile(h_file, au1_str, u1_family_len, &u4_bytes, NULL) && u4_bytes == u1_family_len)
+					{
+						uint16	u1_chars = u1_family_len / 2;
+
+						for (u1 = 0; u1 < u1_chars; u1++)
+						{
+							awz_family[u1] = (wchar_t)((au1_str[u1] << 8) | (au1_str[u1] >> 8));
+						}
+
+						awz_family[u1_chars] = 0;
+					}
+				}
+			}
+		}
+	}
+
+	CloseHandle(h_file);
+
+	if (awz_family[0] == 0)
+	{
+		return NULL;
+	}
+
+	return CreateFontW(i4_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+						DEFAULT_CHARSET,
+						OUT_DEFAULT_PRECIS,
+						CLIP_DEFAULT_PRECIS,
+						DEFAULT_QUALITY,
+						VARIABLE_PITCH,
+						awz_family);
+}
+
+
+//**********************************************************************************************
+// Print a UTF-8 string with the TTF font. The text is word wrapped, centered and anchored
+// to the bottom or top of the screen depending on the formatting flags.
+//
+void CDDFont::PrintUTF8String
+(
+	const char*	str_utf8,
+	uint32		u4_flags
+)
+//*************************************
+{
+	if (prasMainScreen == NULL)
+	{
+		return;
+	}
+
+	void*	hfont_use = (hfontTTF != NULL) ? hfontTTF : hfont;
+
+	// convert the UTF-8 string to UTF-16
+	int32	i4_len = MultiByteToWideChar(CP_UTF8, 0, str_utf8, -1, NULL, 0);
+
+	if (i4_len <= 1)
+	{
+		return;
+	}
+
+	wchar_t*	pwz_str = new wchar_t[i4_len];
+	MultiByteToWideChar(CP_UTF8, 0, str_utf8, -1, pwz_str, i4_len);
+
+	prasMainScreen->Unlock();
+
+	HDC	hdc = prasMainScreen->hdcGet();
+
+	SetTextColor(hdc, u4Colour);
+
+	if (bFill)
+	{
+		SetBkColor(hdc, 0);
+		SetBkMode(hdc, OPAQUE);
+	}
+	else
+	{
+		SetBkMode(hdc, TRANSPARENT);
+	}
+
+	void* hfont_old = SelectObject(hdc, hfont_use);
+
+	int32	i4_scr_width	= prasMainScreen->iWidth - (TEXT_BORDER_X * 2);
+	int32	i4_left			= TEXT_BORDER_X;
+	int32	i4_right		= TEXT_BORDER_X + i4_scr_width;
+	int32	i4_top;
+	int32	i4_bottom;
+
+	uint32	u4_dt_flags = DT_CENTER | DT_WORDBREAK | DT_NOPREFIX;
+
+	if (u4_flags & TEXT_FORMAT_TOP)
+	{
+		i4_top		= TEXT_BORDER_Y;
+		i4_bottom	= prasMainScreen->iHeight;
+	}
+	else
+	{
+		// subtitles are anchored to the bottom of the screen by default.
+		// DT_BOTTOM requires DT_SINGLELINE, so the text height is measured
+		// first with a scratch rect and the draw rect is positioned after.
+		// (DT_CALCRECT modifies the rect in place, it must not be reused.)
+		RECT	rc_measure = { i4_left, 0, i4_right, prasMainScreen->iHeight };
+
+		int32	i4_h = DrawTextW(hdc, pwz_str, -1, &rc_measure, u4_dt_flags | DT_CALCRECT);
+
+		i4_bottom	= prasMainScreen->iHeight - TEXT_BORDER_Y;
+		i4_top		= i4_bottom - i4_h;
+	}
+
+	RECT	rc = { i4_left, i4_top, i4_right, i4_bottom };
+
+	DrawTextW(hdc, pwz_str, -1, &rc, u4_dt_flags);
+
+	delete pwz_str;
+
+	if (hfont_old)
+	{
+		SelectObject(hdc, hfont_old);
+	}
+
+	prasMainScreen->ReleaseDC(hdc);
 }
 
 

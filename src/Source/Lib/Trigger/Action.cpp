@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright ï¿½ DreamWorks Interactive. 1997
  *
  * Contents:
  *		CAction::CreateTriggerAction
@@ -89,6 +89,8 @@
 #include "Lib/GeomDBase/WaveletQuadTree.hpp"
 #include "Lib\GeomDBase\TerrainTexture.hpp"
 #include "Lib/Sys/DebugConsole.hpp"
+#include "Lib/Sys/reg.h"
+#include "Lib/Sys/RegInit.hpp"
 #include "Lib/Renderer/LightBlend.hpp"
 #include "Lib/Sys/W95/Render.hpp"
 #include "Lib/Std/Random.hpp"
@@ -3084,6 +3086,12 @@ void CSaveLevelAction::Start()
 	//*****************************************************************************************
 	void CTextAction::Start()
 	{
+		// Tutorial messages can be disabled from the config file.
+		if (GetModValue(REG_KEY_TUTORIALS, DEFAULT_TUTORIALS) == 0)
+		{
+			return;
+		}
+
 		char*	str_string;
 		char	str_buf[256];
 

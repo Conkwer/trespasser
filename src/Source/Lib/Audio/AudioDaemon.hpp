@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright ï¿½ DreamWorks Interactive. 1997
  *
  * Contents:
  *	CAudioDaemon definition
@@ -678,6 +678,13 @@ public:
 	void ProcessSubtitle
 	(
 		CSample*	psam
+	);
+
+	//******************************************************************************************
+	// Schedule the subtitle lines from an override .srt file.
+	void ProcessSrtSubtitle
+	(
+		const char*	str_path
 	);
 
 

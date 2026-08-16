@@ -1,6 +1,6 @@
 /**********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1996
+ * Copyright ï¿½ DreamWorks Interactive. 1996
  *
  * Implementation of Repaly.hpp and replay support code
  *
@@ -94,6 +94,10 @@ ostream					dout(&debug_stream);
 
 #endif
 
+// The debug log file is written by default, it can be disabled with Debug=0 in the
+// config file. The flag is set after the config has been loaded.
+bool	bDebugLogFile = true;
+
 
 //**********************************************************************************************
 // Implementation of dbgstreambuf class which is derived from the C++ iostream classes....
@@ -164,14 +168,15 @@ ostream					dout(&debug_stream);
 		if (ch == EOF)
 			return ch;
 
-		buf[u4Off] = (char)ch;	
+		buf[u4Off] = (char)ch;
 		u4Off++;
 		if ((ch == '\n') || (u4Off>=1020))
 		{
 			buf[u4Off] = 0;
 			OutputDebugString(buf);
 
-			if (bFile)
+			// The debug log file can be disabled from the config file (Debug=0).
+			if (bFile && bDebugLogFile)
 			{
 				// write the same string to the file
 				dbgfile << buf;

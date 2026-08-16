@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright ï¿½ DreamWorks Interactive. 1997
  *
  * Contents:
  *	CAudio
@@ -2113,6 +2113,18 @@ CSample* CAudio::psamCreateSample
 
 	//  a NULL loader passed to here will result in a empty sample.
 	psam = new CSample(pcau,u4_flags,pdlcbfn,pv_user);
+
+	//
+	// Override directory support: attach a loose .srt subtitle file to the sample if
+	// one exists for this sound handle.
+	//
+	const char*	pstr_srt = padat->pstrFindSrtOverride(sndhnd_sample);
+
+	if (pstr_srt)
+	{
+		psam->strSrtOverride = new char[ strlen(pstr_srt)+1 ];
+		strcpy(psam->strSrtOverride, pstr_srt);
+	}
 
 	return psam;
 }

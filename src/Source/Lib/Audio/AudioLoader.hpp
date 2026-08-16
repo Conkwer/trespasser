@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright ï¿½ DreamWorks Interactive. 1997
  *
  * Contents:
  *		CCAULoad - Audio loading base class
@@ -337,6 +337,13 @@ typedef map< uint64, SAudioCollision*, less<uint64> >	TCollisionHash;
 
 
 //**********************************************************************************************
+// Override directory support: loose files in override\<TPA base name>\ replace samples
+// inside the packed file. Maps sample hash -> full override file path.
+typedef map< uint32, char*, less<uint32> >				TOverrideHash;
+// prefix: oh
+
+
+//**********************************************************************************************
 struct SAudioHandle
 // prefix: ah
 {
@@ -437,13 +444,40 @@ public:
 	void CloseDatabaseFile(HANDLE h_file);
 
 	//******************************************************************************************
+	// Return the full path of a loose override file (override\<base>\<name>.cau/.wav/.adx)
+	// whose hash matches the given sound handle, or NULL if there is no override.
+	// The path is in the database name's case; the file system is case insensitive on Windows.
+	const char* pstrFindOverride(TSoundHandle sndhnd)
+	{
+		TOverrideHash::iterator i = ohOverrides.find(sndhnd);
+
+		if (i == ohOverrides.end())
+			return NULL;
+		else
+			return (*i).second;
+	}
+
+	//******************************************************************************************
+	// Return the full path of a loose .srt subtitle override for the given sound handle
+	// or NULL if there is no override.
+	const char* pstrFindSrtOverride(TSoundHandle sndhnd)
+	{
+		TOverrideHash::iterator i = ohSrtOverrides.find(sndhnd);
+
+		if (i == ohSrtOverrides.end())
+			return NULL;
+		else
+			return (*i).second;
+	}
+
+	//******************************************************************************************
 	float fGetSampleLength(TSoundHandle	sndhnd)
 	{
 		SSampleFile*	psf = psfFindSample(sndhnd);
 
 		if (psf)
 		{
-			return (float)psf->cauheaderIndex.u4DecompressedSize 
+			return (float)psf->cauheaderIndex.u4DecompressedSize
 				/ (float)(psf->cauheaderIndex.u4Frequency*(psf->cauheaderIndex.u1Bits/8)*psf->cauheaderIndex.u1Channels);
 		}
 
@@ -451,12 +485,23 @@ public:
 	}
 
 protected:
+	// Store the packed file's base name (no path or extension) in strBaseName.
+	void StoreBaseName(const char* str_filename);
+
+	// Scan override\<base name>\ for loose override files (.cau, .wav, .adx, .srt) and
+	// register them keyed by the hash of their file name.
+	void ScanOverrideDirectory();
+
 	SPackedAudioHeader		pahHeader;
 	TFileSampleHash			fshSamples;
 	SSampleFile*			psfIdentifiers;
 	TSoundHandle			sndhndMissing;
 	TCollisionHash*			pchCollisions;
 	SAudioCollision*		acolCollisions;
+
+	char					strBaseName[64];		// packed file name without path or extension
+	TOverrideHash			ohOverrides;			// hash -> path of loose audio overrides
+	TOverrideHash			ohSrtOverrides;			// hash -> path of loose .srt overrides
 
 	HANDLE					hDatabase;			// file handle if sharing or NULL
 	uint32					u4HandleCount;		// number of handles in the array below

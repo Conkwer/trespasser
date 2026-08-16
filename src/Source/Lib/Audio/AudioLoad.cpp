@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright ï¿½ DreamWorks Interactive. 1997
  *
  * Contents:
  *		CCAULoad - Abstract base class for loading audio data.
@@ -140,6 +140,8 @@
 #include "AudioPCM.hpp"
 #include "AudioADPCM.hpp"
 #include "AudioVOICE.hpp"
+
+#include <math.h>
 
 
 //**********************************************************************************************
@@ -665,6 +667,531 @@ CCAULoad* CCAULoad::pcauCreateAudioLoader
 
 
 //**********************************************************************************************
+// Load an uncompressed PCM .wav file through the CCAULoad interface. A synthetic CAU header
+// is built from the WAV header so the existing PCM decoder can stream the file.
+//
+CCAULoad* pcauCreateWavAudioLoader
+(
+	char*	str_fname
+)
+//**************************************
+{
+	struct SWavChunk
+	{
+		uint32	u4Id;
+		uint32	u4Size;
+	};
+
+	struct SWavFmt
+	{
+		uint16	u1Format;
+		uint16	u1Channels;
+		uint32	u4Frequency;
+		uint32	u4ByteRate;
+		uint16	u1BlockAlign;
+		uint16	u1Bits;
+	};
+
+	HANDLE	h_file = CreateFile( str_fname, GENERIC_READ, FILE_SHARE_READ, NULL,
+                                OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0 );
+
+	if (h_file == INVALID_HANDLE_VALUE)
+	{
+		dprintf("Open audio file '%s' failed\n", str_fname);
+		return NULL;
+	}
+
+	uint32	u4_bytes;
+	uint32	u4_riff;
+	uint32	u4_size;
+	uint32	u4_wave;
+
+	if (ReadFile(h_file, &u4_riff, 4, (DWORD*)&u4_bytes, NULL) == false || u4_bytes != 4 ||
+		ReadFile(h_file, &u4_size, 4, (DWORD*)&u4_bytes, NULL) == false || u4_bytes != 4 ||
+		ReadFile(h_file, &u4_wave, 4, (DWORD*)&u4_bytes, NULL) == false || u4_bytes != 4)
+	{
+		dprintf("WAV header read failed (loaded) for '%s'\n", str_fname);
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	// Note: the multi-char literal 'RIFF' puts the first character in the high byte
+	// in VC6, so little endian file reads must be compared against explicit constants.
+	if (u4_riff != 0x46464952 || u4_wave != 0x45564157)
+	{
+		dprintf("Non RIFF/WAVE file (loaded) for '%s' (riff=%08X size=%08X wave=%08X)\n",
+				str_fname, u4_riff, u4_size, u4_wave);
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	uint16	u1_format		= 0;
+	uint16	u1_channels		= 0;
+	uint32	u4_freq			= 0;
+	uint16	u1_bits			= 0;
+	uint16	u1_block_align	= 0;
+	uint32	u4_fact_samples	= 0;
+	uint32	u4_data_offset	= 0;
+	uint32	u4_data_size	= 0;
+
+	while (u4_data_offset == 0)
+	{
+		SWavChunk	wch;
+
+		if (ReadFile(h_file, &wch, sizeof(wch), (DWORD*)&u4_bytes, NULL) == false || u4_bytes != sizeof(wch))
+		{
+			dprintf("WAV chunk header read failed (loaded) for '%s'\n", str_fname);
+			CloseHandle(h_file);
+			return NULL;
+		}
+
+		if (wch.u4Id == 0x20746D66)
+		{
+			SWavFmt	wfmt;
+
+			if (wch.u4Size < sizeof(wfmt) ||
+				ReadFile(h_file, &wfmt, sizeof(wfmt), (DWORD*)&u4_bytes, NULL) == false || u4_bytes != sizeof(wfmt))
+			{
+				dprintf("WAV fmt chunk read failed (loaded) for '%s'\n", str_fname);
+				CloseHandle(h_file);
+				return NULL;
+			}
+
+			u1_format		= wfmt.u1Format;
+			u1_channels		= wfmt.u1Channels;
+			u4_freq			= wfmt.u4Frequency;
+			u1_bits			= wfmt.u1Bits;
+			u1_block_align	= wfmt.u1BlockAlign;
+
+			// skip any remaining fmt bytes
+			if (wch.u4Size > sizeof(wfmt))
+			{
+				SetFilePointer(h_file, wch.u4Size - sizeof(wfmt), NULL, FILE_CURRENT);
+			}
+		}
+		else if (wch.u4Id == 0x61746164)
+		{
+			u4_data_offset	= SetFilePointer(h_file, 0, NULL, FILE_CURRENT);
+			u4_data_size	= wch.u4Size;
+		}
+		else
+		{
+			if (wch.u4Id == 0x74636166 && wch.u4Size >= 4)
+			{
+				// sample count per channel for compressed formats
+				ReadFile(h_file, &u4_fact_samples, 4, (DWORD*)&u4_bytes, NULL);
+
+				if (wch.u4Size > 4)
+				{
+					SetFilePointer(h_file, wch.u4Size - 4, NULL, FILE_CURRENT);
+				}
+			}
+			else
+			{
+				SetFilePointer(h_file, wch.u4Size, NULL, FILE_CURRENT);
+			}
+		}
+	}
+
+	bool	b_pcm	= (u1_format == 1) && (u1_bits == 8 || u1_bits == 16);
+	bool	b_adpcm	= (u1_format == 0x11) && (u1_block_align > 0);
+
+	if ((!b_pcm && !b_adpcm) || u4_data_offset == 0 || u4_data_size == 0 || u1_channels == 0)
+	{
+		dprintf("Unsupported WAV format (loaded) for '%s' (fmt=%i bits=%i ch=%i)\n",
+				str_fname, (int)u1_format, (int)u1_bits, (int)u1_channels);
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	SCAUHeader	cau;
+	memset(&cau, 0, sizeof(cau));
+
+	cau.u4Magic			= 'ROBW';
+	cau.u4Version		= 100;
+	cau.u4Offset		= u4_data_offset;
+	cau.u4DataSize		= u4_data_size;
+	cau.u4Frequency		= u4_freq;
+	cau.u1Channels		= (uint8)u1_channels;
+
+	if (b_adpcm)
+	{
+		// IMA ADPCM WAV: decoded through the game's existing ADPCM decoder.
+		// The output of the decoder is 16 bit.
+		cau.u4BlockAlignment	= u1_block_align;
+		cau.u1Bits				= 16;
+		cau.u1Compression		= AU_COMPRESS_ADPCM;
+
+		// decompressed size: fact chunk if present, otherwise estimate from the
+		// number of blocks. Each block has a 4 byte header per channel.
+		if (u4_fact_samples != 0)
+		{
+			cau.u4DecompressedSize = u4_fact_samples * u1_channels * 2;
+		}
+		else
+		{
+			uint32	u4_samp_per_block	= ((u1_block_align / u1_channels - 4) * 2) + 1;
+			uint32	u4_blocks			= u4_data_size / u1_block_align;
+
+			cau.u4DecompressedSize = u4_blocks * u4_samp_per_block * u1_channels * 2;
+		}
+
+		dprintf("WAV loaded OK (ADPCM) '%s' (%i Hz, %i ch, block=%i)\n",
+				str_fname, (int)u4_freq, (int)u1_channels, (int)u1_block_align);
+
+		return new CAudioADPCM(NULL, h_file, 0, cau);
+	}
+
+	cau.u4BlockAlignment	= 0;					// raw PCM
+	cau.u4DecompressedSize	= u4_data_size;
+	cau.u1Bits				= (uint8)u1_bits;
+	cau.u1Compression		= AU_COMPRESS_PCM;
+
+	dprintf("WAV loaded OK '%s' (%i Hz, %i ch, %i bit)\n",
+			str_fname, (int)u4_freq, (int)u1_channels, (int)u1_bits);
+
+	return new CAudioPCM(NULL, h_file, 0, cau);
+}
+
+
+//**********************************************************************************************
+// CAudioADX streams CRI ADX files (16 bit only) through the CCAULoad interface. ADX is the
+// Dreamcast/Saturn ADPCM variant used by the modding community; the codec itself was ported
+// from the background music player.
+//
+class CAudioADX : public CCAULoad
+{
+public:
+	CAudioADX
+	(
+		CAudioDatabase*	padat,
+		HANDLE			h_file,
+		uint32			u4_fpos,
+		SCAUHeader&		cau,
+		int32			i4_coeff1,
+		int32			i4_coeff2
+	) : CCAULoad(padat, h_file, u4_fpos, cau)
+	{
+		u4SourceDataSize	= 0;
+		pu1SourceData		= NULL;
+		u4FreshBytes		= 0;
+		pu1Next				= NULL;
+		u4BlockSize			= 0;
+
+		i4Coeff1 = i4_coeff1;
+		i4Coeff2 = i4_coeff2;
+
+		s1[0] = s1[1] = 0;
+		s2[0] = s2[1] = 0;
+
+		// one decode unit is a frame group: one 18 byte frame per channel,
+		// producing 32 interleaved 16 bit samples per channel.
+		u4DecompressedBlockSize = 32 * cauheaderLocal.u1Channels * 2;
+
+		pu1BlockBuffer = new uint8[u4DecompressedBlockSize + 32];
+		MEMLOG_ADD_COUNTER(emlSoundLoader, u4DecompressedBlockSize + 32);
+	}
+
+	~CAudioADX()
+	{
+		MEMLOG_SUB_COUNTER(emlSoundLoader, u4DecompressedBlockSize + 32);
+		delete pu1BlockBuffer;
+	}
+
+	virtual uint32 u4DecompressMono8bit(uint8* pu1_dst, uint32 u4_byte_count)
+	{
+		Assert(0);
+		return 0;
+	}
+
+	virtual uint32 u4DecompressStereo8bit(uint8* pu1_dst, uint32 u4_byte_count)
+	{
+		Assert(0);
+		return 0;
+	}
+
+	virtual uint32 u4DecompressMono16bit(uint8* pu1_dst, uint32 u4_byte_count)
+	{
+		return u4Decompress16bit(pu1_dst, u4_byte_count, 1);
+	}
+
+	virtual uint32 u4DecompressStereo16bit(uint8* pu1_dst, uint32 u4_byte_count)
+	{
+		return u4Decompress16bit(pu1_dst, u4_byte_count, 2);
+	}
+
+	virtual void SetSampleSource(uint8* pu1_src, uint32 u4_src_len)
+	{
+		pu1SourceData		= pu1_src;
+		u4SourceDataSize	= u4_src_len;
+		u4BlockSize			= min(u4_src_len, cauheaderLocal.u4BlockAlignment);
+
+		// a zero length source is used to reset the loader to the start of the sample
+		if (u4_src_len == 0)
+		{
+			s1[0] = s1[1] = 0;
+			s2[0] = s2[1] = 0;
+		}
+	}
+
+	virtual uint32 u4GetRemainingData()
+	{
+		return u4SourceDataSize;
+	}
+
+protected:
+	//******************************************************************************************
+	// Decode one frame (18 bytes) of one channel into 32 samples.
+	uint32 u4DecodeFrame(uint8* pu1_src, uint32 u4_channel, short* ps_dst)
+	{
+		int32	i4_scale = ((pu1_src[0] << 8) | pu1_src[1]) & 0x1FFF;
+		int32	i4_s1 = s1[u4_channel];
+		int32	i4_s2 = s2[u4_channel];
+		uint32	u4;
+
+		for (u4 = 2; u4 < 18; u4++)
+		{
+			int32	i4_b = pu1_src[u4];
+			int32	i4_d;
+			int32	i4_s0;
+
+			// high nibble first
+			i4_d = i4_b >> 4;
+			if (i4_d & 8) i4_d -= 16;
+			i4_s0 = i4_d * i4_scale + ((i4Coeff1 * i4_s1 + i4Coeff2 * i4_s2) >> 14);
+			if (i4_s0 > 32767) i4_s0 = 32767;
+			else if (i4_s0 < -32768) i4_s0 = -32768;
+			*ps_dst++ = (short)i4_s0;
+			i4_s2 = i4_s1;
+			i4_s1 = i4_s0;
+
+			// low nibble
+			i4_d = i4_b & 15;
+			if (i4_d & 8) i4_d -= 16;
+			i4_s0 = i4_d * i4_scale + ((i4Coeff1 * i4_s1 + i4Coeff2 * i4_s2) >> 14);
+			if (i4_s0 > 32767) i4_s0 = 32767;
+			else if (i4_s0 < -32768) i4_s0 = -32768;
+			*ps_dst++ = (short)i4_s0;
+			i4_s2 = i4_s1;
+			i4_s1 = i4_s0;
+		}
+
+		s1[u4_channel] = i4_s1;
+		s2[u4_channel] = i4_s2;
+
+		return 32;
+	}
+
+	//******************************************************************************************
+	uint32 u4Decompress16bit(uint8* pu1_dst, uint32 u4_byte_count, uint32 u4_channels)
+	{
+		uint32	u4_count;
+		uint32	u4_total = 0;
+
+		while ((u4_byte_count) && (u4SourceDataSize > 0))
+		{
+			if (u4FreshBytes == 0)
+			{
+				// decode one frame group (one frame per channel) into the block buffer
+				if (u4BlockSize >= 18 * u4_channels)
+				{
+					short*	ps_dst = (short*)pu1BlockBuffer;
+					uint32	u4;
+
+					for (u4 = 0; u4 < u4_channels; u4++)
+					{
+						short	as_tmp[32];
+
+						u4DecodeFrame(pu1SourceData + u4 * 18, u4, as_tmp);
+
+						uint32	u4_smp;
+
+						for (u4_smp = 0; u4_smp < 32; u4_smp++)
+						{
+							ps_dst[u4_smp * u4_channels + u4] = as_tmp[u4_smp];
+						}
+					}
+
+					u4FreshBytes = 32 * u4_channels * 2;
+				}
+				else
+				{
+					// partial frame group at the very end of the sample, ignore it
+					u4FreshBytes = 0;
+				}
+
+				u4SourceDataSize -= u4BlockSize;
+				pu1SourceData += u4BlockSize;
+
+				pu1Next = pu1BlockBuffer;
+			}
+
+			if (u4FreshBytes == 0)
+			{
+				break;
+			}
+
+			u4_count = min(u4_byte_count, u4FreshBytes);
+
+			memcpy(pu1_dst, pu1Next, u4_count);
+			pu1_dst += u4_count;
+			pu1Next += u4_count;
+
+			u4FreshBytes -= u4_count;
+			u4_byte_count -= u4_count;
+
+			u4_total += u4_count;
+		}
+
+		return u4_total;
+	}
+
+	uint32		u4SourceDataSize;
+	uint8*		pu1SourceData;
+	uint32		u4BlockSize;
+	uint32		u4FreshBytes;
+	uint8*		pu1Next;
+	uint8*		pu1BlockBuffer;
+	uint32		u4DecompressedBlockSize;
+
+	int32		i4Coeff1;
+	int32		i4Coeff2;
+	int32		s1[2];
+	int32		s2[2];
+};
+
+
+//**********************************************************************************************
+// Load a CRI ADX file through the CCAULoad interface. Only 16 bit ADX is supported which is
+// the format used for Trespasser mods.
+//
+CCAULoad* pcauCreateAdxAudioLoader
+(
+	char*	str_fname
+)
+//**************************************
+{
+	HANDLE	h_file = CreateFile( str_fname, GENERIC_READ, FILE_SHARE_READ, NULL,
+                                OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0 );
+
+	if (h_file == INVALID_HANDLE_VALUE)
+	{
+		dprintf("Open audio file '%s' failed\n", str_fname);
+		return NULL;
+	}
+
+	uint8	au1_header[0x14];
+	DWORD	u4_bytes;
+
+	if (ReadFile(h_file, au1_header, 0x14, &u4_bytes, NULL) == false || u4_bytes != 0x14)
+	{
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	// ADX header: 0x80 0x00 at the start, big endian fields
+	if (au1_header[0] != 0x80)
+	{
+		dprintf("Non ADX file (loaded) for audio sample\n");
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	uint32	u4_copy_off	= (au1_header[2] << 8) | au1_header[3];
+	uint8	u1_enc_type	= au1_header[4];
+	uint8	u1_blk_size	= au1_header[5];
+	uint8	u1_channels	= au1_header[7];
+	uint32	u4_freq		= (au1_header[8] << 24) | (au1_header[9] << 16) | (au1_header[10] << 8) | au1_header[11];
+	uint32	u4_samples	= (au1_header[12] << 24) | (au1_header[13] << 16) | (au1_header[14] << 8) | au1_header[15];
+	int32	i4_highpass	= (au1_header[0x10] << 8) | au1_header[0x11];
+
+	if (u1_channels == 0 || u1_channels > 2 || u1_blk_size != 18)
+	{
+		dprintf("Unsupported ADX format (loaded) for audio sample\n");
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	// validate the copyright string, it starts 2 bytes before the copy offset
+	if (u4_copy_off < 6 || u4_copy_off > 0x100)
+	{
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	SetFilePointer(h_file, u4_copy_off - 2, NULL, FILE_BEGIN);
+
+	uint8	au1_copy[8];
+
+	if (ReadFile(h_file, au1_copy, 8, &u4_bytes, NULL) == false || u4_bytes != 8 ||
+		memcmp(au1_copy, "(c)CRI", 6) != 0)
+	{
+		dprintf("ADX copyright missing (loaded) for audio sample\n");
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	// audio data starts after the copyright block
+	uint32	u4_data_offset	= u4_copy_off + 4;
+	uint32	u4_file_size	= SetFilePointer(h_file, 0, NULL, FILE_END);
+	uint32	u4_block_align	= 18 * u1_channels;
+
+	if (u4_data_offset >= u4_file_size)
+	{
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	uint32	u4_data_size = ((u4_file_size - u4_data_offset) / u4_block_align) * u4_block_align;
+
+	// prediction coefficients
+	int32	i4_c1;
+	int32	i4_c2;
+
+	if (u1_enc_type == 3)
+	{
+		// standard ADX: compute from the highpass frequency
+		double	d_a		= 1.41421356237 - cos(6.28318530718 * (double)i4_highpass / 44100.0);
+		double	d_b		= 0.41421356237;
+		double	d_cc	= (d_a - sqrt((d_a + d_b) * (d_a - d_b))) / d_b;
+
+		i4_c1 = (int32)(d_cc * 2.0 * 16384.0);
+		i4_c2 = (int32)(-(d_cc * d_cc) * 16384.0);
+	}
+	else
+	{
+		// type 2: no prediction
+		i4_c1 = 0;
+		i4_c2 = 0;
+	}
+
+	SCAUHeader	cau;
+	memset(&cau, 0, sizeof(cau));
+
+	// some encoders write an inflated total sample count, clamp it to the actual
+	// number of frames in the file
+	uint32	u4_frame_samples = (u4_data_size / u4_block_align) * 32;
+	uint32	u4_dec_samples  = (u4_samples != 0 && u4_samples < u4_frame_samples) ? u4_samples : u4_frame_samples;
+
+	cau.u4Magic				= 'ROBW';
+	cau.u4Version			= 100;
+	cau.u4Offset			= u4_data_offset;
+	cau.u4BlockAlignment	= u4_block_align;
+	cau.u4DataSize			= u4_data_size;
+	cau.u4DecompressedSize	= u4_dec_samples * u1_channels * 2;
+	cau.u4Frequency			= u4_freq;
+	cau.u1Bits				= 16;
+	cau.u1Channels			= u1_channels;
+	cau.u1Compression		= AU_COMPRESS_ADPCM;
+
+	dprintf("ADX loaded OK '%s' (%i Hz, %i ch)\n",
+			str_fname, (int)u4_freq, (int)u1_channels);
+
+	return new CAudioADX(NULL, h_file, 0, cau, i4_c1, i4_c2);
+}
+
+
+//**********************************************************************************************
 // Static helper function to create a loader class from a CAU file within in a packed file.
 // By default loader classes own the file that they are created with and will close it when the
 // loader is destroyed. For packed file loads we must clear the file owenership otherwise we 
@@ -675,14 +1202,45 @@ CCAULoad* CCAULoad::pcauCreateAudioLoader
 	CAudioDatabase*		padat,
 	TSoundHandle		sndhnd
 )
-//	
+//
 //**************************************
 {
-	MEMLOG_ADD_COUNTER(emlSoundLoader,sizeof(CCAULoad));	
+	MEMLOG_ADD_COUNTER(emlSoundLoader,sizeof(CCAULoad));
 
 	// there is no audio loader..
 	if (padat == NULL)
 		return NULL;
+
+	//
+	// Override directory support: if a loose file exists in override\<pack name>\ for
+	// this sample hash, load it instead of the packed sample. Supported formats:
+	// .cau, .wav (uncompressed PCM) and .adx (CRI ADPCM).
+	//
+	const char*	pstr_override = padat->pstrFindOverride(sndhnd);
+
+	if (pstr_override)
+	{
+		dprintf("Override hit '%s' for sample %08X\n", pstr_override, (uint32)sndhnd);
+
+		char*		pstr_path = (char*)pstr_override;
+		char*		pstr_ext  = strrchr(pstr_path, '.');
+
+		if (pstr_ext)
+		{
+			if (stricmp(pstr_ext, ".cau") == 0)
+			{
+				return pcauCreateAudioLoader(pstr_path);
+			}
+			else if (stricmp(pstr_ext, ".wav") == 0)
+			{
+				return pcauCreateWavAudioLoader(pstr_path);
+			}
+			else if (stricmp(pstr_ext, ".adx") == 0)
+			{
+				return pcauCreateAdxAudioLoader(pstr_path);
+			}
+		}
+	}
 
 	SSampleFile*	psf_sample = padat->psfFindSample(sndhnd);
 
@@ -1000,6 +1558,15 @@ CAudioDatabase::CAudioDatabase
                                 OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0 );
 		}
 	}
+
+	//
+	// Store the packed file's base name (without path or extension) so that we can
+	// look for loose override files in the override directory.
+	//
+	StoreBaseName(str_filename);
+
+	ScanOverrideDirectory();
+
 	return;
 
 error:
@@ -1084,6 +1651,19 @@ CAudioDatabase::~CAudioDatabase
 		}
 		aahHandles = NULL;
 	}
+
+	// Free the override directory paths.
+	TOverrideHash::iterator it;
+
+	for (it = ohOverrides.begin(); it != ohOverrides.end(); ++it)
+	{
+		delete[] (*it).second;
+	}
+
+	for (it = ohSrtOverrides.begin(); it != ohSrtOverrides.end(); ++it)
+	{
+		delete[] (*it).second;
+	}
 }
 
 
@@ -1144,6 +1724,120 @@ void CAudioDatabase::CloseDatabaseFile
 
 	// Handle does not belong to this database.......
 	Assert(0);
+}
+
+
+//**********************************************************************************************
+// Store the packed file's base name (without path or extension) in strBaseName so that the
+// database can look for loose override files in the override directory.
+//
+void CAudioDatabase::StoreBaseName
+(
+	const char*	str_filename
+)
+//**************************************
+{
+	strBaseName[0] = 0;
+
+	const char* pstr_base = str_filename + strlen(str_filename);
+
+	while (pstr_base > str_filename && pstr_base[-1] != '\\' && pstr_base[-1] != '/' && pstr_base[-1] != ':')
+	{
+		pstr_base--;
+	}
+
+	uint32 u4_base_len = 0;
+
+	while (pstr_base[u4_base_len] != 0 && pstr_base[u4_base_len] != '.')
+	{
+		u4_base_len++;
+	}
+
+	if (u4_base_len > 0 && u4_base_len < sizeof(strBaseName))
+	{
+		memcpy(strBaseName, pstr_base, u4_base_len);
+		strBaseName[u4_base_len] = 0;
+	}
+}
+
+
+//**********************************************************************************************
+// Scan the override directory (override\<base name>\) for loose files that replace samples
+// from this packed audio file. File names are hashed with the same function the game uses
+// for sample names (sndhndHashIdentifier), so "BIRD 07.cau" overrides the packed sample
+// whose identifier was hashed from "BIRD 07".
+//
+void CAudioDatabase::ScanOverrideDirectory
+(
+)
+//**************************************
+{
+	if (strBaseName[0] == 0)
+	{
+		return;
+	}
+
+	char			asz_pattern[_MAX_PATH];
+	WIN32_FIND_DATA	ffd;
+	HANDLE			h_find;
+	const char*		asz_exts[4] = { "*.cau", "*.wav", "*.adx", "*.srt" };
+	uint32			u4;
+
+	for (u4 = 0; u4 < 4; u4++)
+	{
+		wsprintf(asz_pattern, "override\\%s\\%s", strBaseName, asz_exts[u4]);
+
+		h_find = FindFirstFile(asz_pattern, &ffd);
+
+		if (h_find == INVALID_HANDLE_VALUE)
+		{
+			continue;
+		}
+
+		do
+		{
+			// skip directories
+			if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			{
+				continue;
+			}
+
+			// strip the extension to get the sample name, hash it (the hash function
+			// lowercases the name itself).
+			char	asz_name[_MAX_PATH];
+			strcpy(asz_name, ffd.cFileName);
+
+			char*	pstr_dot = strrchr(asz_name, '.');
+
+			if (pstr_dot)
+			{
+				*pstr_dot = 0;
+			}
+
+			uint32	u4_hash = sndhndHashIdentifier(asz_name);
+
+			if (u4_hash == 0)
+			{
+				continue;
+			}
+
+			// build the full relative path of the override file
+			char*	pstr_path = new char[_MAX_PATH];
+			wsprintf(pstr_path, "override\\%s\\%s", strBaseName, ffd.cFileName);
+
+			if (u4 == 3)
+			{
+				ohSrtOverrides[u4_hash] = pstr_path;
+			}
+			else
+			{
+				ohOverrides[u4_hash] = pstr_path;
+			}
+		}
+		while (FindNextFile(h_find, &ffd));
+
+		FindClose(h_find);
+	}
 }
 
 

@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1998
+ * Copyright ï¿½ DreamWorks Interactive. 1998
  *
  * Contents:
  *	CTextOverlay
@@ -46,6 +46,7 @@
 #include "Lib/View/RasterVid.hpp"
 #include "Lib/W95/DDFont.hpp"
 #include "Lib/Sys/W95/Render.hpp"
+#include "Lib/Sys/DebugConsole.hpp"
 #include "Lib/EntityDBase/MessageTypes/MsgStep.hpp"
 #include "Lib/EntityDBase/MessageTypes/MsgPaint.hpp"
 #include "Lib/EntityDBase/MessageTypes/MsgSystem.hpp"
@@ -205,6 +206,43 @@ uint32 CTextOverlay::u4DisplayPositionedString
 
 
 //**********************************************************************************************
+// Display a UTF-8 string (e.g. an SRT subtitle line) with the TTF font. The line becomes
+// visible after s_start seconds and is removed after s_end seconds.
+uint32 CTextOverlay::u4DisplayUTF8String
+(
+	char*		str_text,			// UTF-8 C style text string
+	TSec		s_start,			// time from now to display the line
+	TSec		s_end,				// time from now to remove the line
+	uint32		u4_flags,			// formatting flags
+	CColour		clr,				// colour of the text
+	ETextType	ett					// type of the text
+)
+//*************************************
+{
+	STextElement	tel;
+
+	tel.sRemove		= CMessageStep::sElapsedRealTime + s_start;
+	tel.sRemove2	= CMessageStep::sElapsedRealTime + s_end;
+	tel.strString	= new char[ strlen(str_text)+1 ];
+	strcpy(tel.strString, str_text);
+	tel.u4XPos		= 0;
+	tel.u4YPos		= 0;
+	tel.clrText		= clr;
+	tel.u4Flags		= u4_flags | TEXT_FORMAT_RAW | TEXT_FORMAT_UTF8 | TEXT_FORMAT_TIMED;
+	tel.ptelNext	= NULL;
+	tel.ettType		= ett;
+
+	// Add this item to the draw list
+	ttlTextItems.push_front(tel);
+
+	// get the address of the item we have just added
+	STextElement*	ptel = &(*(ttlTextItems.begin()));
+
+	return (uint32)ptel;
+}
+
+
+//**********************************************************************************************
 void CTextOverlay::Process
 (
 	const CMessageSystem& msg_system
@@ -233,6 +271,17 @@ void CTextOverlay::Process
 		{
 			if ( (*i).u4Flags & TEXT_FORMAT_IGNORE)
 				continue;
+
+			if ( (*i).u4Flags & TEXT_FORMAT_TIMED)
+			{
+				// the line is not visible yet, wait for its start time
+				if (CMessageStep::sElapsedRealTime < (*i).sRemove)
+					continue;
+
+				// the line is now visible, remove it at the end time
+				(*i).sRemove = (*i).sRemove2;
+				(*i).u4Flags &= ~TEXT_FORMAT_TIMED;
+			}
 
 			if (CMessageStep::sElapsedRealTime >=(*i).sRemove)
 			{
@@ -266,10 +315,21 @@ void CTextOverlay::Process
 		if ( (*i).u4Flags & TEXT_FORMAT_IGNORE)
 			continue;
 
+		// timed lines are not visible until their start time arrives
+		if ( (*i).u4Flags & TEXT_FORMAT_TIMED)
+			continue;
+
 		pfntOverlayFont->SetFill( ((*i).u4Flags & TEXT_FORMAT_SOLID) );
 		pfntOverlayFont->SetColour( (*i).clrText );
 
-		if ((*i).u4Flags & TEXT_FORMAT_RAW)
+		if ((*i).u4Flags & TEXT_FORMAT_UTF8)
+		{
+			// print the UTF-8 string with the TTF font
+			dprintf("UTF8 text paint: flags=%08X screen=%dx%d\n",
+					(*i).u4Flags, prasMainScreen->iWidth, prasMainScreen->iHeight);
+			pfntOverlayFont->PrintUTF8String( (*i).strString, (*i).u4Flags );
+		}
+		else if ((*i).u4Flags & TEXT_FORMAT_RAW)
 		{
 			// print the text at the specified position
 			pfntOverlayFont->PrintOverlayString(  (int32)((*i).u4XPos),(int32)((*i).u4YPos), (*i).strString);
