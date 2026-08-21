@@ -673,12 +673,18 @@ CCAULoad* CCAULoad::pcauCreateAudioLoader
 // Load an uncompressed PCM .wav file through the CCAULoad interface. A synthetic CAU header
 // is built from the WAV header so the existing PCM decoder can stream the file.
 //
-CCAULoad* pcauCreateWavAudioLoader
+CCAULoad* pcauCreateWavAudioLoaderFromHandle
 (
-	char*	str_fname
+	HANDLE		h_file,
+	uint32		u4_base,
+	const char*	str_debug
 )
 //**************************************
 {
+	// position the file at the start of the WAV data (a zip entry's data offset for
+	// archived overrides, 0 for a loose file)
+	SetFilePointer(h_file, u4_base, NULL, FILE_BEGIN);
+
 	struct SWavChunk
 	{
 		uint32	u4Id;
@@ -695,15 +701,6 @@ CCAULoad* pcauCreateWavAudioLoader
 		uint16	u1Bits;
 	};
 
-	HANDLE	h_file = CreateFile( str_fname, GENERIC_READ, FILE_SHARE_READ, NULL,
-                                OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0 );
-
-	if (h_file == INVALID_HANDLE_VALUE)
-	{
-		dprintf("Open audio file '%s' failed\n", str_fname);
-		return NULL;
-	}
-
 	uint32	u4_bytes;
 	uint32	u4_riff;
 	uint32	u4_size;
@@ -713,7 +710,7 @@ CCAULoad* pcauCreateWavAudioLoader
 		ReadFile(h_file, &u4_size, 4, (DWORD*)&u4_bytes, NULL) == false || u4_bytes != 4 ||
 		ReadFile(h_file, &u4_wave, 4, (DWORD*)&u4_bytes, NULL) == false || u4_bytes != 4)
 	{
-		dprintf("WAV header read failed (loaded) for '%s'\n", str_fname);
+		dprintf("WAV header read failed (loaded) for '%s'\n", str_debug);
 		CloseHandle(h_file);
 		return NULL;
 	}
@@ -723,7 +720,7 @@ CCAULoad* pcauCreateWavAudioLoader
 	if (u4_riff != 0x46464952 || u4_wave != 0x45564157)
 	{
 		dprintf("Non RIFF/WAVE file (loaded) for '%s' (riff=%08X size=%08X wave=%08X)\n",
-				str_fname, u4_riff, u4_size, u4_wave);
+				str_debug, u4_riff, u4_size, u4_wave);
 		CloseHandle(h_file);
 		return NULL;
 	}
@@ -743,7 +740,7 @@ CCAULoad* pcauCreateWavAudioLoader
 
 		if (ReadFile(h_file, &wch, sizeof(wch), (DWORD*)&u4_bytes, NULL) == false || u4_bytes != sizeof(wch))
 		{
-			dprintf("WAV chunk header read failed (loaded) for '%s'\n", str_fname);
+			dprintf("WAV chunk header read failed (loaded) for '%s'\n", str_debug);
 			CloseHandle(h_file);
 			return NULL;
 		}
@@ -755,7 +752,7 @@ CCAULoad* pcauCreateWavAudioLoader
 			if (wch.u4Size < sizeof(wfmt) ||
 				ReadFile(h_file, &wfmt, sizeof(wfmt), (DWORD*)&u4_bytes, NULL) == false || u4_bytes != sizeof(wfmt))
 			{
-				dprintf("WAV fmt chunk read failed (loaded) for '%s'\n", str_fname);
+				dprintf("WAV fmt chunk read failed (loaded) for '%s'\n", str_debug);
 				CloseHandle(h_file);
 				return NULL;
 			}
@@ -802,7 +799,7 @@ CCAULoad* pcauCreateWavAudioLoader
 	if ((!b_pcm && !b_adpcm) || u4_data_offset == 0 || u4_data_size == 0 || u1_channels == 0)
 	{
 		dprintf("Unsupported WAV format (loaded) for '%s' (fmt=%i bits=%i ch=%i)\n",
-				str_fname, (int)u1_format, (int)u1_bits, (int)u1_channels);
+				str_debug, (int)u1_format, (int)u1_bits, (int)u1_channels);
 		CloseHandle(h_file);
 		return NULL;
 	}
@@ -812,7 +809,7 @@ CCAULoad* pcauCreateWavAudioLoader
 
 	cau.u4Magic			= 'ROBW';
 	cau.u4Version		= 100;
-	cau.u4Offset		= u4_data_offset;
+	cau.u4Offset		= u4_data_offset - u4_base;
 	cau.u4DataSize		= u4_data_size;
 	cau.u4Frequency		= u4_freq;
 	cau.u1Channels		= (uint8)u1_channels;
@@ -840,9 +837,9 @@ CCAULoad* pcauCreateWavAudioLoader
 		}
 
 		dprintf("WAV loaded OK (ADPCM) '%s' (%i Hz, %i ch, block=%i)\n",
-				str_fname, (int)u4_freq, (int)u1_channels, (int)u1_block_align);
+				str_debug, (int)u4_freq, (int)u1_channels, (int)u1_block_align);
 
-		return new CAudioADPCM(NULL, h_file, 0, cau);
+		return new CAudioADPCM(NULL, h_file, u4_base, cau);
 	}
 
 	cau.u4BlockAlignment	= 0;					// raw PCM
@@ -851,9 +848,31 @@ CCAULoad* pcauCreateWavAudioLoader
 	cau.u1Compression		= AU_COMPRESS_PCM;
 
 	dprintf("WAV loaded OK '%s' (%i Hz, %i ch, %i bit)\n",
-			str_fname, (int)u4_freq, (int)u1_channels, (int)u1_bits);
+			str_debug, (int)u4_freq, (int)u1_channels, (int)u1_bits);
 
-	return new CAudioPCM(NULL, h_file, 0, cau);
+	return new CAudioPCM(NULL, h_file, u4_base, cau);
+}
+
+
+//**********************************************************************************************
+// Open a loose .wav override file and build a loader for it.
+//
+CCAULoad* pcauCreateWavAudioLoader
+(
+	char*	str_fname
+)
+//**************************************
+{
+	HANDLE	h_file = CreateFile( str_fname, GENERIC_READ, FILE_SHARE_READ, NULL,
+	                                OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0 );
+
+	if (h_file == INVALID_HANDLE_VALUE)
+	{
+		dprintf("Open audio file '%s' failed\n", str_fname);
+		return NULL;
+	}
+
+	return pcauCreateWavAudioLoaderFromHandle(h_file, 0, str_fname);
 }
 
 
@@ -1195,6 +1214,54 @@ CCAULoad* pcauCreateAdxAudioLoader
 
 
 //**********************************************************************************************
+struct SZipSlot
+// prefix: zs
+{
+	uint32		u4LocalOffset;			// file offset of the entry's local header
+	uint32		u4DataSize;				// uncompressed data size (== stored compressed size)
+};
+
+
+//**********************************************************************************************
+class CStoredZip
+// prefix: sz
+{
+public:
+	CStoredZip();
+	~CStoredZip();
+
+	// Index the archive at str_path. str_language (e.g. "Ru") enables language specific
+	// overrides: <name>.<lang>.wav/.srt win over <name>.wav/.srt. Returns false if the file
+	// is not a valid stored-only zip.
+	bool bOpen(const char* str_path, const char* str_language);
+
+	// Does an audio (.wav) override entry exist for this sound handle?
+	bool bFindAudio(uint32 u4_hash, uint32& ru4_local, uint32& ru4_size) const;
+
+	// Does a subtitle (.srt) override entry exist for this sound handle?
+	bool bFindSrt(uint32 u4_hash, uint32& ru4_local, uint32& ru4_size) const;
+
+	// Read the full content of an entry into a new NUL terminated heap buffer. The caller
+	// owns the buffer. Returns NULL on failure.
+	char* pstrReadEntry(uint32 u4_local, uint32 u4_size) const;
+
+	// Open a fresh handle positioned at the start of an entry's data and return the data
+	// offset. The caller owns the handle and must close it. Returns INVALID_HANDLE_VALUE
+	// on failure.
+	HANDLE hOpenEntry(uint32 u4_local, uint32* pu4_data_offset) const;
+
+protected:
+	// File offset of an entry's data given its local header offset, or 0 on failure.
+	uint32 u4DataOffset(HANDLE h_file, uint32 u4_local) const;
+
+	char											aszPath[_MAX_PATH];		// archive path
+	char											aszLang[16];			// language suffix or ""
+	map< uint32, SZipSlot, less<uint32> >			mpAudio;				// hash -> audio slot
+	map< uint32, SZipSlot, less<uint32> >			mpAudioLang;			// hash -> audio slot (lang)
+	map< uint32, SZipSlot, less<uint32> >			mpSrt;					// hash -> srt slot
+	map< uint32, SZipSlot, less<uint32> >			mpSrtLang;				// hash -> srt slot (lang)
+};
+
 // Static helper function to create a loader class from a CAU file within in a packed file.
 // By default loader classes own the file that they are created with and will close it when the
 // loader is destroyed. For packed file loads we must clear the file owenership otherwise we 
@@ -1241,6 +1308,38 @@ CCAULoad* CCAULoad::pcauCreateAudioLoader
 			else if (stricmp(pstr_ext, ".adx") == 0)
 			{
 				return pcauCreateAdxAudioLoader(pstr_path);
+			}
+		}
+	}
+
+	//
+// A minimal ZIP reader that supports only "stored" (uncompressed) entries. It backs the
+// override\<base>.tpz archive: a disk-on-demand replacement for a TPA that holds loose .wav
+// and .srt override files. Only the central directory is kept in memory; entry bytes are read
+// from disk on demand. Entries are indexed by the same lowercase hash as loose override files
+// so lookups are case insensitive.
+//
+
+
+	// Override archive support: if no loose override file exists, look inside the
+	// override\<base>.tpz archive (a stored-only zip holding .wav and .srt overrides).
+	// Entries are streamed straight from the archive file on demand.
+	//
+	CStoredZip*	pzip = padat->pzipGetArchive();
+
+	if (pzip)
+	{
+		uint32	u4_local, u4_size;
+
+		if (pzip->bFindAudio(sndhnd, u4_local, u4_size))
+		{
+			uint32	u4_data_offset = 0;
+			HANDLE	h_zip = pzip->hOpenEntry(u4_local, &u4_data_offset);
+
+			if (h_zip != INVALID_HANDLE_VALUE)
+			{
+				dprintf("Override archive hit for sample %08X\n", (uint32)sndhnd);
+				return pcauCreateWavAudioLoaderFromHandle(h_zip, u4_data_offset, "override archive");
 			}
 		}
 	}
@@ -1304,10 +1403,433 @@ void CCAULoad::ResetToStartPosition
 	u4SampleOffset = 0;
 }
 
+//**********************************************************************************************
+// sndhndHashIdentifier is defined in Sample.cpp (it is a file-local helper in this library).
+//
+uint32 sndhndHashIdentifier(const char* str);
+
+
+//**********************************************************************************************
 
 
 
+//**********************************************************************************************
+CStoredZip::CStoredZip()
+//**************************************
+{
+	aszPath[0] = 0;
+	aszLang[0] = 0;
+}
 
+
+//**********************************************************************************************
+CStoredZip::~CStoredZip()
+//**************************************
+{
+}
+
+
+//**********************************************************************************************
+bool CStoredZip::bOpen
+(
+	const char*		str_path,
+	const char*		str_language
+)
+//**************************************
+{
+	strcpy(aszPath, str_path);
+	strcpy(aszLang, str_language ? str_language : "");
+
+	HANDLE	h_file = CreateFile( str_path, GENERIC_READ, FILE_SHARE_READ, NULL,
+	                             OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0 );
+
+	if (h_file == INVALID_HANDLE_VALUE)
+	{
+		dprintf("Override archive '%s' not found\n", str_path);
+		return false;
+	}
+
+	DWORD	dw_size = GetFileSize(h_file, NULL);
+
+	if (dw_size < 22)
+	{
+		CloseHandle(h_file);
+		return false;
+	}
+
+	//
+	// Read the tail of the file and locate the End Of Central Directory record
+	// (PK\x05\x06). The EOCD gives the offset and size of the central directory.
+	//
+	const uint32	u4_max_eocd	= 65557;		// max EOCD size + any archive comment
+	uint32			u4_tail_len	= (uint32)min((uint32)dw_size, u4_max_eocd);
+	uint8*			pu1_tail	= new uint8[u4_tail_len];
+	DWORD			u4_read		= 0;
+
+	SetFilePointer(h_file, dw_size - u4_tail_len, NULL, FILE_BEGIN);
+
+	if (ReadFile(h_file, pu1_tail, u4_tail_len, &u4_read, NULL) == false)
+	{
+		delete[] pu1_tail;
+		CloseHandle(h_file);
+		return false;
+	}
+
+	int		i_eocd = -1;
+	uint32	u4;
+
+	for (u4 = u4_tail_len - 22; (int)u4 >= 0; u4--)
+	{
+		if (pu1_tail[u4] == 0x50 && pu1_tail[u4+1] == 0x4B &&
+			pu1_tail[u4+2] == 0x05 && pu1_tail[u4+3] == 0x06)
+		{
+			i_eocd = (int)u4;
+			break;
+		}
+	}
+
+	if (i_eocd < 0)
+	{
+		delete[] pu1_tail;
+		CloseHandle(h_file);
+		return false;
+	}
+
+	uint16		u2_entries	= *(uint16*)(pu1_tail + i_eocd + 10);
+	uint32		u4_cd_size	= *(uint32*)(pu1_tail + i_eocd + 12);
+	uint32		u4_cd_off	= *(uint32*)(pu1_tail + i_eocd + 16);
+	dprintf("Zip EOCD: tail_off=%d entries=%u cd_size=%u cd_off=%u\n",
+	        i_eocd, (uint32)u2_entries, u4_cd_size, u4_cd_off);
+
+	delete[] pu1_tail;
+
+	// refuse absurd central directories
+	if (u4_cd_size == 0 || u4_cd_size > 16*1024*1024 || u2_entries == 0)
+	{
+		CloseHandle(h_file);
+		return false;
+	}
+
+	uint8*	pu1_cd = new uint8[u4_cd_size];
+
+	SetFilePointer(h_file, u4_cd_off, NULL, FILE_BEGIN);
+
+	if (ReadFile(h_file, pu1_cd, u4_cd_size, &u4_read, NULL) == false || u4_read != u4_cd_size)
+	{
+		delete[] pu1_cd;
+		CloseHandle(h_file);
+		return false;
+	}
+
+	CloseHandle(h_file);
+
+	//
+	// Walk the central directory entries.
+	//
+	uint8*	p			= pu1_cd;
+	uint32	u4_lang_len	= (uint32)strlen(aszLang);
+
+	dprintf("Zip first entry: sig=%08X method=%u name_len=%u\n",
+	        *(uint32*)pu1_cd, (uint32)*(uint16*)(pu1_cd + 10),
+	        (uint32)*(uint16*)(pu1_cd + 28));
+
+	for (u4 = 0; u4 < u2_entries && p + 46 <= pu1_cd + u4_cd_size; u4++)
+	{
+		// every entry is a central directory file header
+		if (*(uint32*)p != 0x02014b50)
+			break;
+
+		uint16		u2_method		= *(uint16*)(p + 10);
+		uint16		u2_name_len		= *(uint16*)(p + 28);
+		uint16		u2_extra_len	= *(uint16*)(p + 30);
+		uint16		u2_comment_len	= *(uint16*)(p + 32);
+		uint32		u4_local		= *(uint32*)(p + 42);
+		uint32		u4_size			= *(uint32*)(p + 24);
+		const char*	pstr_name		= (const char*)(p + 46);
+
+		p += 46 + u2_name_len + u2_extra_len + u2_comment_len;
+
+		if (u2_method != 0)					// only uncompressed entries are supported
+			continue;
+
+		if (u2_name_len == 0 || u2_name_len > _MAX_PATH - 1)
+			continue;
+
+		// basename: strip any directory prefix (start at the name itself; names without a
+		// directory keep the whole name — the previous code started at the end of the name
+		// which made every slash-less entry read past the name and fail the extension check)
+		const char*	pstr_base = pstr_name;
+		int			i;
+
+		for (i = (int)u2_name_len - 1; i >= 0; i--)
+		{
+			if (pstr_name[i] == '/' || pstr_name[i] == '\\')
+			{
+				pstr_base = pstr_name + i + 1;
+				break;
+			}
+		}
+
+		// split name into base + extension. The central-directory name is NOT
+		// null-terminated, so copy exactly the basename length (strncpy would
+		// pull in the next entry header and corrupt the extension check).
+		char	asz_name[_MAX_PATH];
+		char	asz_ext[16];
+
+		i = (int)u2_name_len - (int)(pstr_base - pstr_name);
+
+		if (i > _MAX_PATH - 1)
+			i = _MAX_PATH - 1;
+
+		memcpy(asz_name, pstr_base, i);
+		asz_name[i] = 0;
+
+		char*	pstr_dot = strrchr(asz_name, '.');
+
+		if (pstr_dot)
+		{
+			strcpy(asz_ext, pstr_dot);
+			*pstr_dot = 0;
+		}
+		else
+		{
+			asz_ext[0] = 0;
+		}
+
+		// only .wav and .srt entries are supported
+		bool	b_wav = (stricmp(asz_ext, ".wav") == 0);
+		bool	b_srt = (stricmp(asz_ext, ".srt") == 0);
+
+		if (u4 < 3)
+		{
+			dprintf("Zip entry %u: name='%s' ext='%s' b_wav=%d b_srt=%d\n",
+			        u4, asz_name, asz_ext, (int)b_wav, (int)b_srt);
+		}
+
+		if (!b_wav && !b_srt)
+			continue;
+
+		// language detection: <name>.<lang>.<ext> wins over <name>.<ext>
+		bool	b_lang		= false;
+		uint32	u4_name_len	= (uint32)strlen(asz_name);
+
+		if (aszLang[0] &&
+			u4_name_len > u4_lang_len + 1 &&
+			asz_name[u4_name_len - u4_lang_len - 1] == '.' &&
+			stricmp(asz_name + u4_name_len - u4_lang_len, aszLang) == 0)
+		{
+			b_lang = true;
+		}
+
+
+		SZipSlot	slot;
+
+		slot.u4LocalOffset	= u4_local;
+		slot.u4DataSize		= u4_size;
+
+		uint32	u4_hash = sndhndHashIdentifier(asz_name);
+
+		if (b_lang)
+		{
+			map< uint32, SZipSlot, less<uint32> >& mp_dst = b_srt ? mpSrtLang : mpAudioLang;
+
+			mp_dst[u4_hash] = slot;
+
+			// register the base name too so it beats a generic <name>.<ext>
+			asz_name[u4_name_len - u4_lang_len - 1] = 0;
+
+			uint32	u4_hash_base = sndhndHashIdentifier(asz_name);
+
+			if (u4_hash_base != 0 && u4_hash_base != u4_hash)
+				mp_dst[u4_hash_base] = slot;
+		}
+		else
+		{
+			map< uint32, SZipSlot, less<uint32> >& mp_dst = b_srt ? mpSrt : mpAudio;
+
+			mp_dst[u4_hash] = slot;
+		}
+	}
+
+	delete[] pu1_cd;
+
+	dprintf("Zip parsed: srt=%u srtlang=%u wav=%u wavlang=%u\n",
+	        (uint32)mpSrt.size(), (uint32)mpSrtLang.size(),
+	        (uint32)mpAudio.size(), (uint32)mpAudioLang.size());
+
+	dprintf("Override archive '%s' opened (%u srt, %u wav entries)\n",
+	        aszPath, (uint32)(mpSrt.size() + mpSrtLang.size()),
+	        (uint32)(mpAudio.size() + mpAudioLang.size()));
+
+	return true;
+}
+
+
+//**********************************************************************************************
+bool CStoredZip::bFindAudio
+(
+	uint32		u4_hash,
+	uint32&		ru4_local,
+	uint32&		ru4_size
+) const
+//**************************************
+{
+	map< uint32, SZipSlot, less<uint32> >::const_iterator i;
+
+	if (aszLang[0])
+	{
+		i = mpAudioLang.find(u4_hash);
+
+		if (i != mpAudioLang.end())
+		{
+			ru4_local = (*i).second.u4LocalOffset;
+			ru4_size  = (*i).second.u4DataSize;
+			return true;
+		}
+	}
+
+	i = mpAudio.find(u4_hash);
+
+	if (i == mpAudio.end())
+		return false;
+
+	ru4_local = (*i).second.u4LocalOffset;
+	ru4_size  = (*i).second.u4DataSize;
+	return true;
+}
+
+
+//**********************************************************************************************
+bool CStoredZip::bFindSrt
+(
+	uint32		u4_hash,
+	uint32&		ru4_local,
+	uint32&		ru4_size
+) const
+//**************************************
+{
+	map< uint32, SZipSlot, less<uint32> >::const_iterator i;
+
+	if (aszLang[0])
+	{
+		i = mpSrtLang.find(u4_hash);
+
+		if (i != mpSrtLang.end())
+		{
+			ru4_local = (*i).second.u4LocalOffset;
+			ru4_size  = (*i).second.u4DataSize;
+			return true;
+		}
+	}
+
+	i = mpSrt.find(u4_hash);
+
+	if (i == mpSrt.end())
+		return false;
+
+	ru4_local = (*i).second.u4LocalOffset;
+	ru4_size  = (*i).second.u4DataSize;
+	return true;
+}
+
+
+//**********************************************************************************************
+uint32 CStoredZip::u4DataOffset
+(
+	HANDLE		h_file,
+	uint32		u4_local
+) const
+//**************************************
+{
+	BYTE	au1[30];
+	DWORD	u4_read = 0;
+
+	SetFilePointer(h_file, u4_local, NULL, FILE_BEGIN);
+
+	if (ReadFile(h_file, au1, 30, &u4_read, NULL) == false || u4_read != 30)
+		return 0;
+
+	if (*(uint32*)au1 != 0x04034b50)			// local file header signature
+		return 0;
+
+	uint16	u2_name_len  = *(uint16*)(au1 + 26);
+	uint16	u2_extra_len = *(uint16*)(au1 + 28);
+
+	return u4_local + 30 + u2_name_len + u2_extra_len;
+}
+
+
+//**********************************************************************************************
+char* CStoredZip::pstrReadEntry
+(
+	uint32		u4_local,
+	uint32		u4_size
+) const
+//**************************************
+{
+	HANDLE	h_file = CreateFile( aszPath, GENERIC_READ, FILE_SHARE_READ, NULL,
+	                             OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0 );
+
+	if (h_file == INVALID_HANDLE_VALUE)
+		return NULL;
+
+	uint32	u4_data = u4DataOffset(h_file, u4_local);
+
+	if (u4_data == 0)
+	{
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	SetFilePointer(h_file, u4_data, NULL, FILE_BEGIN);
+
+	char*	pstr_buf = new char[u4_size + 1];
+	DWORD	u4_read = 0;
+
+	if (ReadFile(h_file, pstr_buf, u4_size, &u4_read, NULL) == false || u4_read != u4_size)
+	{
+		delete[] pstr_buf;
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	CloseHandle(h_file);
+
+	pstr_buf[u4_size] = 0;
+
+	return pstr_buf;
+}
+
+
+//**********************************************************************************************
+HANDLE CStoredZip::hOpenEntry
+(
+	uint32		u4_local,
+	uint32*		pu4_data_offset
+) const
+//**************************************
+{
+	HANDLE	h_file = CreateFile( aszPath, GENERIC_READ, FILE_SHARE_READ, NULL,
+	                             OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0 );
+
+	if (h_file == INVALID_HANDLE_VALUE)
+		return h_file;
+
+	uint32	u4_data = u4DataOffset(h_file, u4_local);
+
+	if (u4_data == 0)
+	{
+		CloseHandle(h_file);
+		return INVALID_HANDLE_VALUE;
+	}
+
+	SetFilePointer(h_file, u4_data, NULL, FILE_BEGIN);
+
+	if (pu4_data_offset)
+		*pu4_data_offset = u4_data;
+
+	return h_file;
+}
 
 
 
@@ -1339,6 +1861,7 @@ CAudioDatabase::CAudioDatabase
 	SFileCollision * pfcol = NULL;
 	hDatabase = NULL;		// there is no static database handle
 	aahHandles = NULL;
+	pzipArchive = NULL;
 
     u4_access = GENERIC_READ;
     if (!bIsTrespasser)
@@ -1570,6 +2093,31 @@ CAudioDatabase::CAudioDatabase
 
 	ScanOverrideDirectory();
 
+	//
+	// Override archive support: override\<base>.tpz (or override\<base>\<base>.tpz) is a
+	// stored-only zip holding loose .wav and .srt override files. Only its central directory
+	// is indexed here; entry bytes are read from disk on demand.
+	//
+	char	asz_zip[_MAX_PATH];
+
+	wsprintf(asz_zip, "override\\%s\\%s.tpz", strBaseName, strBaseName);
+
+	if (GetFileAttributes(asz_zip) == 0xFFFFFFFF)
+	{
+		wsprintf(asz_zip, "override\\%s.tpz", strBaseName);
+	}
+
+	if (GetFileAttributes(asz_zip) != 0xFFFFFFFF)
+	{
+		pzipArchive = new CStoredZip;
+
+		if (pzipArchive->bOpen(asz_zip, strLanguage) == false)
+		{
+			delete pzipArchive;
+			pzipArchive = NULL;
+		}
+	}
+
 	return;
 
 error:
@@ -1610,6 +2158,10 @@ CAudioDatabase::~CAudioDatabase
 	MEMLOG_SUB_ADRSIZE(emlSoundControl,psfIdentifiers);
 	MEMLOG_SUB_ADRSIZE(emlSoundControl,pchCollisions);
 	MEMLOG_SUB_ADRSIZE(emlSoundControl,acolCollisions);
+
+	// Delete the override archive if we opened one
+	delete pzipArchive;
+	pzipArchive = NULL;
 
 	// Delete the identifiers for this database
 	if (psfIdentifiers)
@@ -1941,4 +2493,72 @@ void CAudioDatabase::Reset
 	{
 		(*i).second->fTimeLastUsed = 0.0f;
 	}
+}
+
+
+//**********************************************************************************************
+// Read a small file into a NUL terminated heap buffer. The caller owns the buffer.
+//
+static char* pstrReadFileToMemory
+(
+	const char*	str_path
+)
+//**************************************
+{
+	HANDLE	h_file = CreateFile( str_path, GENERIC_READ, FILE_SHARE_READ, NULL,
+	                             OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0 );
+
+	if (h_file == INVALID_HANDLE_VALUE)
+		return NULL;
+
+	DWORD	dw_size = GetFileSize(h_file, NULL);
+
+	if (dw_size == 0 || dw_size > 256*1024)
+	{
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	char*	pstr_buf = new char[dw_size + 1];
+	DWORD	u4_read = 0;
+
+	if (ReadFile(h_file, pstr_buf, dw_size, &u4_read, NULL) == false || u4_read != dw_size)
+	{
+		delete[] pstr_buf;
+		CloseHandle(h_file);
+		return NULL;
+	}
+
+	CloseHandle(h_file);
+
+	pstr_buf[u4_read] = 0;
+
+	return pstr_buf;
+}
+
+
+//**********************************************************************************************
+// Return the content of an override .srt subtitle for a sound handle as a heap buffer:
+// loose override file first, then the override archive. The caller owns the buffer.
+//
+char* CAudioDatabase::pstrLoadSrtContent
+(
+	TSoundHandle	sndhnd
+)
+//**************************************
+{
+	const char*	pstr_path = pstrFindSrtOverride(sndhnd);
+
+	if (pstr_path)
+		return pstrReadFileToMemory(pstr_path);
+
+	if (pzipArchive)
+	{
+		uint32	u4_local, u4_size;
+
+		if (pzipArchive->bFindSrt(sndhnd, u4_local, u4_size))
+			return pzipArchive->pstrReadEntry(u4_local, u4_size);
+	}
+
+	return NULL;
 }

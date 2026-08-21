@@ -232,6 +232,7 @@ struct SFileCollision
 
 //**********************************************************************************************
 class CAudioDatabase;
+class CStoredZip;
 
 
 //**********************************************************************************************
@@ -488,6 +489,19 @@ public:
 	}
 
 	//******************************************************************************************
+	// Return the content of an override .srt subtitle for the given sound handle as a heap
+	// buffer (loose file first, then the override archive), or NULL. The caller owns the
+	// buffer. Language specific files take priority.
+	char* pstrLoadSrtContent(TSoundHandle sndhnd);
+
+	//******************************************************************************************
+	// Return the override archive (override\<base>.tpz) or NULL if there is none.
+	CStoredZip* pzipGetArchive()
+	{
+		return pzipArchive;
+	}
+
+	//******************************************************************************************
 	float fGetSampleLength(TSoundHandle	sndhnd)
 	{
 		SSampleFile*	psf = psfFindSample(sndhnd);
@@ -522,6 +536,7 @@ protected:
 	TOverrideHash			ohOverridesLang;		// language specific audio overrides
 	TOverrideHash			ohSrtOverrides;			// hash -> path of loose .srt overrides
 	TOverrideHash			ohSrtOverridesLang;		// language specific .srt overrides
+	CStoredZip*				pzipArchive;			// override\<base>.tpz archive or NULL
 
 	HANDLE					hDatabase;			// file handle if sharing or NULL
 	uint32					u4HandleCount;		// number of handles in the array below

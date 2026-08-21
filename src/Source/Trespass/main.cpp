@@ -541,10 +541,13 @@ CheckFS:
     }
 
 	//
-	// Display a dialog indicating that the application is running in safe 
+	// Display a dialog indicating that the application is running in safe
     // mode if it is running in safe mode.
 	//
-	if (bSafemode() && !IsKeyDown(VK_SHIFT))
+	// DISABLED: the "Trespasser was unstable last time" dialog blocks automated testing
+	// (force-killing the game leaves Safemode=1 in the config). The game always loads normally.
+	//
+	if (false && bSafemode() && !IsKeyDown(VK_SHIFT))
 	{
 		if (bRunSafeMode())
 		{

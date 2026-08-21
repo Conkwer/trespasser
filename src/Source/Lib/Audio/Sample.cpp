@@ -422,7 +422,7 @@ CSample::~CSample
 	// we delete the subtitle even if there is no audio buffer
 	delete pasubSubtitle;
 
-	delete strSrtOverride;
+	delete[] strSrtOverride;
 }
 
 

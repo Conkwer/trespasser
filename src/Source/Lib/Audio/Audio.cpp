@@ -2115,16 +2115,11 @@ CSample* CAudio::psamCreateSample
 	psam = new CSample(pcau,u4_flags,pdlcbfn,pv_user);
 
 	//
-	// Override directory support: attach a loose .srt subtitle file to the sample if
-	// one exists for this sound handle.
+	// Override directory support: attach the content of an override .srt subtitle to the
+	// sample if one exists for this sound handle (loose file first, then the override
+	// archive). The buffer is owned by the sample and freed when it is destroyed.
 	//
-	const char*	pstr_srt = padat->pstrFindSrtOverride(sndhnd_sample);
-
-	if (pstr_srt)
-	{
-		psam->strSrtOverride = new char[ strlen(pstr_srt)+1 ];
-		strcpy(psam->strSrtOverride, pstr_srt);
-	}
+	psam->strSrtOverride = padat->pstrLoadSrtContent(sndhnd_sample);
 
 	return psam;
 }

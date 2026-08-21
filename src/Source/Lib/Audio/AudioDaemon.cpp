@@ -2907,48 +2907,20 @@ void CAudioDaemon::ProcessSubtitle
 
 
 //**********************************************************************************************
-// Parse an .srt subtitle file and schedule all of its lines on the text overlay system.
-// SRT times are relative to the start of the voice over.
+// Parse an .srt subtitle (in memory, supplied by the override system) and schedule
+// all of its lines on the text overlay system. SRT times are relative to the start
+// of the voice over.
 //
 void CAudioDaemon::ProcessSrtSubtitle
 (
-	const char*	str_path
+	const char*	pstr_srt
 )
 //*************************************
 {
-	HANDLE	h_file = CreateFile( str_path, GENERIC_READ, FILE_SHARE_READ, NULL,
-                                OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0 );
-
-	if (h_file == INVALID_HANDLE_VALUE)
-	{
-		dprintf("Open subtitle file '%s' failed\n", str_path);
+	if (pstr_srt == NULL || pstr_srt[0] == 0)
 		return;
-	}
 
-	DWORD	u4_size = GetFileSize(h_file, NULL);
-
-	if (u4_size == 0 || u4_size > 256*1024)
-	{
-		CloseHandle(h_file);
-		return;
-	}
-
-	char*	pstr_buf = new char[u4_size + 1];
-	DWORD	u4_read = 0;
-
-	if (ReadFile(h_file, pstr_buf, u4_size, &u4_read, NULL) == false)
-	{
-		delete pstr_buf;
-		CloseHandle(h_file);
-		return;
-	}
-
-	CloseHandle(h_file);
-
-	pstr_buf[u4_read]		= 0;
-	pstr_buf[u4_size]		= 0;
-
-	char*	p = pstr_buf;
+	char*	p = (char*)pstr_srt;
 
 	// skip a UTF-8 byte order mark if there is one
 	if ((uint8)p[0] == 0xEF && (uint8)p[1] == 0xBB && (uint8)p[2] == 0xBF)
@@ -3153,8 +3125,6 @@ void CAudioDaemon::ProcessSrtSubtitle
 									CColour(255,255,255), ettSUBTITLE);
 		}
 	}
-
-	delete pstr_buf;
 }
 
 

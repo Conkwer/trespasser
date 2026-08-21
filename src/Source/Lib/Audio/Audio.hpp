@@ -1161,7 +1161,7 @@ public:
 	LPDIRECTSOUND3DBUFFER	pDS3DBuffer;	// 3d interface, NULL if not 3D
 	CAudioSubtitle*			pasubSubtitle;	// pointer to the sub title or NULL
 
-	char*					strSrtOverride;	// path of an override .srt subtitle file or NULL
+	char*					strSrtOverride;	// content of an override .srt subtitle or NULL
 	bool					bSrtSetup;		// the srt subtitles have been scheduled
 
 	uint8*					pu1Lock1;		// base address of first half of lock
