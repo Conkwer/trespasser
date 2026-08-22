@@ -574,6 +574,9 @@ public:
 	
 	extern CProfileStat psCollisionMsgAnimate;
 
+// FASTER cheat: skip impact/fall damage so super-jump landings don't kill Anne.
+bool g_bNoFallDamage = false;
+
 	//******************************************************************************************
 	void CAnimate::Process(const CMessageCollision& msgcoll)
 	{
@@ -652,6 +655,9 @@ public:
 			}
 			else
 			{
+				// FASTER cheat: no impact/fall damage (super-jump landings).
+				if (g_bNoFallDamage)
+					f_damage = 0.0f;
 				// Have we already felt this pain?
 				if (f_damage <= fCollideDamageThisFrame)
 					return;

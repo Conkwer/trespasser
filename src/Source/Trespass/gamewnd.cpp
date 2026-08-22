@@ -63,8 +63,10 @@ enum
     CHEAT_ALLAMMO,
     CHEAT_SLOMO,
 	CHEAT_DINOS,
-	CHEAT_SPEED,
+	CHEAT_FASTER,
 	CHEAT_SAVELOC,
+	CHEAT_JUMP,
+	CHEAT_FAST,
 };
 
 struct
@@ -85,12 +87,18 @@ struct
     "WOO", CHEAT_ALLAMMO,
     "BIONICWOMAN", CHEAT_SLOMO,
 	"DINOS", CHEAT_DINOS,
-	"SPEED", CHEAT_SPEED,
+	"FASTER", CHEAT_FASTER,
 	"SAVELOC", CHEAT_SAVELOC,
+	"JUMP", CHEAT_JUMP,
+	"FAST", CHEAT_FAST,
 };
 
 int g_icCheats = sizeof(CHEATS) / sizeof(CHEATS[0]);
 
+
+extern float g_fJumpScale;
+extern float fJumpScaleDefault;
+extern bool g_bNoFallDamage;
 
 bool ExecuteCheat(LPSTR pszCheat)
 {
@@ -246,12 +254,20 @@ bool ExecuteCheat(LPSTR pszCheat)
 				gaiSystem.bBoring = !gaiSystem.bBoring;
 			}
 			break;
-		case CHEAT_SPEED:
+		case CHEAT_FASTER:
 			{
 				if (CMessageStep::sMultiplier == 1.0f)
-					CMessageStep::sMultiplier = 3.0f;
+				{
+					CMessageStep::sMultiplier = 2.0f;	// 2x game speed
+					g_fJumpScale = 3.0f;				// 3x jump
+					g_bNoFallDamage = true;			// don't die on landing
+				}
 				else
+				{
 					CMessageStep::sMultiplier = 1.0f;
+					g_fJumpScale = GetModValue("legacyjump", 0) ? 1.0f : fJumpScaleDefault;
+					g_bNoFallDamage = false;
+				}
 			}
 			break;
 		case CHEAT_SAVELOC:
@@ -264,6 +280,29 @@ bool ExecuteCheat(LPSTR pszCheat)
 						gpPlayer->v3Pos().tY,
 						gpPlayer->v3Pos().tZ);
 					fclose(f);
+				}
+			}
+			break;
+		case CHEAT_JUMP:
+			{
+				float f;
+				if (sscanf(psz, "%f", &f) == 1)
+					g_fJumpScale = f;
+			}
+			break;
+		case CHEAT_FAST:
+			{
+				if (CMessageStep::sMultiplier == 1.0f)
+				{
+					CMessageStep::sMultiplier = 1.5f;	// 1.5x game speed
+					g_fJumpScale = 3.0f;				// 3x jump
+					g_bNoFallDamage = true;			// don't die on landing
+				}
+				else
+				{
+					CMessageStep::sMultiplier = 1.0f;
+					g_fJumpScale = GetModValue("legacyjump", 0) ? 1.0f : fJumpScaleDefault;
+					g_bNoFallDamage = false;
 				}
 			}
 			break;

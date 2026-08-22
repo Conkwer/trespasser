@@ -67,6 +67,11 @@ BOOL CMainWnd::InitSurface()
 
     CAudioDaemon::SetDataPath(szSource);
 
+    // Init the jump multiplier from config: legacyjump=1 restores the vanilla 4.0 jump.
+    extern float g_fJumpScale;
+    extern float fJumpScaleDefault;
+    g_fJumpScale = GetModValue("legacyjump", 0) ? 1.0f : fJumpScaleDefault;
+
 	// Create the main palette if there isn't one.
     if (!pcdbMain.ppalMain)
 	{
