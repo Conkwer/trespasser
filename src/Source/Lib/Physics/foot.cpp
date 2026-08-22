@@ -24,7 +24,7 @@ float	Pelvis_Jump[3];
 bool	Pelvis_Jump_Voluntary;
 float	fJumpBufferUntil = -1.0f;
 float	g_fJumpScale = 1.0f;      // active jump velocity multiplier (JUMP cheat / legacyjump config)
-float	fJumpScaleDefault = 1.18f; // improved default jump multiplier (matches 1.1 feel, blocks bunny-hop)
+float	fJumpScaleDefault = 1.16f; // improved default jump multiplier (matches 1.1 feel)
 bool	bIsLimp[NUM_PELVISES];
 CSet<int> asFootLatch[NUM_PELVISES];
 

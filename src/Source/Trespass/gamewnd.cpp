@@ -295,7 +295,7 @@ bool ExecuteCheat(LPSTR pszCheat)
 				if (CMessageStep::sMultiplier == 1.0f)
 				{
 					CMessageStep::sMultiplier = 1.5f;	// 1.5x game speed
-					g_fJumpScale = 3.0f;				// 3x jump
+					g_fJumpScale = 2.0f;				// 2x jump
 					g_bNoFallDamage = true;			// don't die on landing
 				}
 				else
