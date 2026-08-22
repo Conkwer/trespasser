@@ -325,7 +325,8 @@ void* CDDFont::LoadTTFFont
 void CDDFont::PrintUTF8String
 (
 	const char*	str_utf8,
-	uint32		u4_flags
+	uint32		u4_flags,
+	uint32		u4_row
 )
 //*************************************
 {
@@ -371,6 +372,17 @@ void CDDFont::PrintUTF8String
 	int32	i4_top;
 	int32	i4_bottom;
 
+	// shift the line up by u4_row line-heights so stacked subtitles don't overlap
+	int32	i4_yoff		= 0;
+
+	if (u4_row)
+	{
+		TEXTMETRIC	tm;
+
+		if (GetTextMetrics(hdc, &tm))
+			i4_yoff = (int32)u4_row * (tm.tmHeight + tm.tmExternalLeading);
+	}
+
 	uint32	u4_dt_flags = DT_CENTER | DT_WORDBREAK | DT_NOPREFIX;
 
 	if (u4_flags & TEXT_FORMAT_TOP)
@@ -388,7 +400,7 @@ void CDDFont::PrintUTF8String
 
 		int32	i4_h = DrawTextW(hdc, pwz_str, -1, &rc_measure, u4_dt_flags | DT_CALCRECT);
 
-		i4_bottom	= prasMainScreen->iHeight - TEXT_BORDER_Y;
+		i4_bottom	= prasMainScreen->iHeight - TEXT_BORDER_Y - i4_yoff;
 		i4_top		= i4_bottom - i4_h;
 	}
 

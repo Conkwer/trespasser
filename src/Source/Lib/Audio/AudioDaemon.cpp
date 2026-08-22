@@ -2928,6 +2928,11 @@ void CAudioDaemon::ProcessSrtSubtitle
 		p += 3;
 	}
 
+	// pick a stable stack row for this voiceover's subtitles: the lowest line not
+	// already used by another subtitle that is on screen (or scheduled), so two
+	// overlapping voiceovers land on different lines instead of on top of each other
+	uint32	u4_row = CTextOverlay::ptovTextSystem->u4NextFreeSubtitleRow();
+
 	while (*p)
 	{
 		// skip blank lines and the entry index line
@@ -3122,7 +3127,7 @@ void CAudioDaemon::ProcessSrtSubtitle
 		{
 			CTextOverlay::ptovTextSystem->u4DisplayUTF8String(asz_text, s_start, s_end,
 									TEXT_FORMAT_BOTTOM | TEXT_FORMAT_CENTER,
-									CColour(255,255,255), ettSUBTITLE);
+									CColour(255,255,255), ettSUBTITLE, u4_row);
 		}
 	}
 }

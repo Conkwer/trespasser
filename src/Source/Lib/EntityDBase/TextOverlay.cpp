@@ -56,6 +56,11 @@
 // A static member pointing one of its own type, the global text system
 CTextOverlay* CTextOverlay::ptovTextSystem = NULL;
 
+// minimum gap (seconds) after a subtitle ends before the next one may start:
+// absorbs tiny timing overlaps in the source SRTs so one caption never flashes
+// over another
+static const TSec kfSUBTITLE_BUFFER = 1.0f;
+
 
 
 //**********************************************************************************************
@@ -120,6 +125,7 @@ uint32 CTextOverlay::u4DisplayFormattedString
 	tel.sRemove				= CMessageStep::sElapsedRealTime + s_time;
 	tel.clrText				= clr;
 	tel.u4Flags				= u4_flags;
+	tel.u4Row				= 0;
 	tel.ptelNext			= NULL;
 	tel.ettType				= ett;
 
@@ -178,6 +184,7 @@ uint32 CTextOverlay::u4DisplayPositionedString
 	strcpy(tel.strString, str_text);
 	tel.u4XPos		= u4_xpos;
 	tel.u4YPos		= u4_ypos;
+	tel.u4Row		= 0;
 	tel.clrText		= clr;
 	tel.u4Flags		= TEXT_FORMAT_RAW;
 	tel.ptelNext	= NULL;
@@ -215,7 +222,8 @@ uint32 CTextOverlay::u4DisplayUTF8String
 	TSec		s_end,				// time from now to remove the line
 	uint32		u4_flags,			// formatting flags
 	CColour		clr,				// colour of the text
-	ETextType	ett					// type of the text
+	ETextType	ett,				// type of the text
+	uint32		u4_row				// stable stack row (0 = bottom) for subtitles
 )
 //*************************************
 {
@@ -223,10 +231,50 @@ uint32 CTextOverlay::u4DisplayUTF8String
 
 	tel.sRemove		= CMessageStep::sElapsedRealTime + s_start;
 	tel.sRemove2	= CMessageStep::sElapsedRealTime + s_end;
+
+	// absorb tiny timing overlaps: if this caption would start right as another
+	// scheduled subtitle is still on screen, nudge it past that one's end so it
+	// never flashes briefly on a second line. Genuine longer overlaps are left
+	// alone — they render on their own sticky row instead.
+	if (ett == ettSUBTITLE)
+	{
+		TSec	s_abs_start	= tel.sRemove;
+		TSec	s_abs_end	= tel.sRemove2;
+
+		for (TTextList::iterator j = ttlTextItems.begin(); j != ttlTextItems.end(); ++j)
+		{
+			if ((*j).ettType != ettSUBTITLE)
+				continue;
+
+			if ((*j).u4Flags & TEXT_FORMAT_IGNORE)
+				continue;
+
+			TSec	s_elem_end		= ((*j).u4Flags & TEXT_FORMAT_TIMED) ? (*j).sRemove2 : (*j).sRemove;
+
+			// only absorb a small overlap (a sub-buffer-sized "flash")
+			if (s_abs_start < s_elem_end && s_elem_end - s_abs_start < kfSUBTITLE_BUFFER)
+			{
+				TSec	s_push = s_elem_end + kfSUBTITLE_BUFFER;
+
+				if (s_push > s_abs_start)
+					s_abs_start = s_push;
+			}
+		}
+
+		if (s_abs_end < s_abs_start + 0.1f)
+		{
+			s_abs_end = s_abs_start + 0.1f;
+		}
+
+		tel.sRemove		= s_abs_start;
+		tel.sRemove2	= s_abs_end;
+	}
+
 	tel.strString	= new char[ strlen(str_text)+1 ];
 	strcpy(tel.strString, str_text);
 	tel.u4XPos		= 0;
 	tel.u4YPos		= 0;
+	tel.u4Row		= u4_row;
 	tel.clrText		= clr;
 	tel.u4Flags		= u4_flags | TEXT_FORMAT_RAW | TEXT_FORMAT_UTF8 | TEXT_FORMAT_TIMED;
 	tel.ptelNext	= NULL;
@@ -324,10 +372,10 @@ void CTextOverlay::Process
 
 		if ((*i).u4Flags & TEXT_FORMAT_UTF8)
 		{
-			// print the UTF-8 string with the TTF font
-			dprintf("UTF8 text paint: flags=%08X screen=%dx%d\n",
-					(*i).u4Flags, prasMainScreen->iWidth, prasMainScreen->iHeight);
-			pfntOverlayFont->PrintUTF8String( (*i).strString, (*i).u4Flags );
+			// print the UTF-8 string with the TTF font. u4Row is the stable stack row
+			// assigned when the subtitle was scheduled, so overlapping captions stay
+			// on their own line instead of jumping around.
+			pfntOverlayFont->PrintUTF8String( (*i).strString, (*i).u4Flags, (*i).u4Row );
 		}
 		else if ((*i).u4Flags & TEXT_FORMAT_RAW)
 		{
@@ -359,6 +407,52 @@ uint32 CTextOverlay::u4FindSequenceEnd
 	}
 
 	return 0;
+}
+
+
+//**********************************************************************************************
+// Return the lowest stack row not currently reserved by a subtitle element (one that is
+// visible now or scheduled to appear). Each voiceover's subtitles are scheduled together
+// and share the row returned here, so overlapping voiceovers land on different lines and
+// stay there until their subtitles finish.
+//
+uint32 CTextOverlay::u4NextFreeSubtitleRow
+(
+)
+//*************************************
+{
+	uint32	u4_row = 0;
+	bool	b_free;
+
+	do
+	{
+		b_free = true;
+
+		for (TTextList::iterator j = ttlTextItems.begin(); j != ttlTextItems.end(); ++j)
+		{
+			if ((*j).ettType != ettSUBTITLE)
+				continue;
+
+			if ((*j).u4Flags & TEXT_FORMAT_IGNORE)
+				continue;
+
+			// a timed (future) line reserves its row only while it is or will be on screen
+			if ((*j).sRemove <= CMessageStep::sElapsedRealTime)
+				continue;
+
+			if ((*j).u4Row == u4_row)
+			{
+				b_free = false;
+				break;
+			}
+		}
+
+		if (!b_free)
+			u4_row++;
+	}
+	while (!b_free && u4_row < 16);
+
+	return u4_row;
 }
 
 

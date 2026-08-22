@@ -67,6 +67,7 @@ struct STextElement
 {
 	TSec	sRemove;
 	TSec	sRemove2;							// removal time for TEXT_FORMAT_TIMED lines
+	uint32		u4Row;							// stable stack row (0 = bottom line) for subtitles
 	union
 	{
 		uint8*		pu1FormattedData;			// either a pointer to formatted data
@@ -145,7 +146,8 @@ public:
 		TSec		s_end,				// time from now to remove the line
 		uint32		u4_flags,			// formatting flags
 		CColour		clr,				// colour of the text
-		ETextType	ett = ettSUBTITLE
+		ETextType	ett = ettSUBTITLE,
+		uint32		u4_row = 0			// stable stack row (0 = bottom) for subtitles
 	);
 
 	//*****************************************************************************************
@@ -153,6 +155,10 @@ public:
 	(
 		ETextType	ett
 	);
+
+	//*****************************************************************************************
+	// Lowest stack row not currently reserved by a subtitle element (visible or scheduled).
+	uint32 u4NextFreeSubtitleRow();
 
 	//*****************************************************************************************
 	void RemoveText

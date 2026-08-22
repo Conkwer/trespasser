@@ -122,10 +122,13 @@ public:
 	// Print a UTF-8 string with the TTF font (HackGenConsoleNF-Regular.ttf if present,
 	// otherwise the regular GDI font). The text is word wrapped, centered and anchored
 	// to the bottom or top of the screen depending on the formatting flags.
+	// u4_row > 0 shifts the line up by that many line-heights (used to stack overlapping
+	// subtitles on separate rows instead of drawing them over each other).
 	void PrintUTF8String
 	(
 		const char*	str_utf8,
-		uint32		u4_flags
+		uint32		u4_flags,
+		uint32		u4_row = 0
 	);
 
 
