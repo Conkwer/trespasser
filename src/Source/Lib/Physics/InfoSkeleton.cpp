@@ -112,9 +112,14 @@
 #include "Lib/GeomDBase/RayCast.hpp"
 #include "Lib/EntityDBase/WorldDBase.hpp"
 #include "Lib/EntityDBase/MessageTypes/MsgPhysicsReq.hpp"
+#include "Lib/EntityDBase/MessageTypes/MsgStep.hpp"
 #include "Lib/EntityDBase/MessageTypes/MsgMove.hpp"
 #include "Lib/EntityDBase/Query/QTerrain.hpp"
 #include "Game/DesignDaemon/Player.hpp"
+
+// Input buffer window (seconds): how long a jump request stays valid after the
+// key press before being discarded if the player never lands.
+static const float kfJumpBufferTime = 0.15f;
 #include "Lib/Std/LocalArray.hpp"
 
 // Debugging rendering stuff.
@@ -447,11 +452,18 @@ extern int	 iKontrol_Jump[NUM_PELVISES];
 			Pelvis_Jump[0] = Pelvis_Jump[1] = 0;
 			Pelvis_Jump[2] = 1;
 			Pelvis_Jump_Voluntary = true;
+			// Buffer the jump for a short real-time window so it survives the
+			// one-shot timing race at high FPS (otherwise the else-branch below
+			// cancels the impulse before the physics has a chance to consume it).
+			fJumpBufferUntil = CMessageStep::sElapsedRealTime + kfJumpBufferTime;
 		}
-		else
+		else if (!Pelvis_Jump_Voluntary || CMessageStep::sElapsedRealTime >= fJumpBufferUntil)
 		{
-			// Always stop jumping if no urgency.
+			// No urgency, and either no pending jump or the buffer expired:
+			// cancel so it can't fire late on a later landing or stay stuck.
 			Pelvis_Jump[0] = Pelvis_Jump[1] = Pelvis_Jump[2] = 0;
+			Pelvis_Jump_Voluntary = false;
+			fJumpBufferUntil = -1.0f;
 		}
 	}
 

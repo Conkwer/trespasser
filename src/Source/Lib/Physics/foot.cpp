@@ -22,6 +22,9 @@ int		iKontrol_Jump[NUM_PELVISES];
 float	Pelvis_Set_Crouch = -100;
 float	Pelvis_Jump[3];
 bool	Pelvis_Jump_Voluntary;
+float	fJumpBufferUntil = -1.0f;
+float	g_fJumpScale = 1.0f;      // active jump velocity multiplier (JUMP cheat / legacyjump config)
+float	fJumpScaleDefault = 1.18f; // improved default jump multiplier (matches 1.1 feel, blocks bunny-hop)
 bool	bIsLimp[NUM_PELVISES];
 CSet<int> asFootLatch[NUM_PELVISES];
 
@@ -1315,12 +1318,14 @@ extern bool	OKtoJUMP;
 				   )
 				
 				{
-					Pel[pelvis][(RIGHT_FOOT+0)][1] = Pel[pelvis][(BODY+0)][1] += 4 * Pelvis_Jump[0];
-					Pel[pelvis][(RIGHT_FOOT+1)][1] = Pel[pelvis][(BODY+1)][1] += 4 * Pelvis_Jump[1];
-					Pel[pelvis][(RIGHT_FOOT+2)][1] = Pel[pelvis][(BODY+2)][1]  = 4 * Pelvis_Jump[2];
+					Pel[pelvis][(RIGHT_FOOT+0)][1] = Pel[pelvis][(BODY+0)][1] += 4 * Pelvis_Jump[0] * g_fJumpScale;
+					Pel[pelvis][(RIGHT_FOOT+1)][1] = Pel[pelvis][(BODY+1)][1] += 4 * Pelvis_Jump[1] * g_fJumpScale;
+					Pel[pelvis][(RIGHT_FOOT+2)][1] = Pel[pelvis][(BODY+2)][1]  = 4 * Pelvis_Jump[2] * g_fJumpScale;
 					Pelvis_Jump[0] = Pelvis_Jump[1] = Pelvis_Jump[2] = 0;
 					if (Pelvis_Jump_Voluntary)
 						NPhysImport::MakePlayerJumpNoise();
+					Pelvis_Jump_Voluntary = false;   // jump consumed - clear the buffer
+					fJumpBufferUntil = -1.0f;
 					BioTag[pelvis][(RIGHT_FOOT+2)] = 0;
 				}
 				else conPhysics << "JumpFailure: " << Xob[feetwet].Wz << " and slope: " << slohp << "\n";

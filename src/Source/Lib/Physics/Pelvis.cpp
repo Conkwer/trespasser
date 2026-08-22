@@ -2,6 +2,7 @@
 //	=============================
 
 #include <math.h>
+#include <float.h>
 #include "Common.hpp"
 #include "Pelvis.h"
 #include "futil.h"
@@ -1161,6 +1162,16 @@ int				count_dracula = 0;
 
 				while (1) 
 				{
+					if (!_finite(L))
+					{
+						conPhysics << "FINITY BAILOUT IN PELVIS FOR L: " << L << "\n";
+						// Incomplete workaround: substitute a valid, normalised vector.
+						Pel[i][(index+0)][0] = 0.25f;
+						Pel[i][(index+1)][0] = 0.25f;
+						Pel[i][(index+2)][0] = 0.25f;
+						Pel[i][(index+3)][0] = 0.25f;
+						break;
+					}
 
 					if ( fabs(L) < lag_max ) break;
 					count_dracula++;

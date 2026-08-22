@@ -93,6 +93,9 @@ extern float	History[ NUM_PELVISES ][ PELVIS_DOF ];
 extern int		Hand_Drop_Flag[ NUM_PELVISES ];					//Flag set by physics to inform
 extern float	Pelvis_Jump[3];
 extern bool		Pelvis_Jump_Voluntary;
+extern float		fJumpBufferUntil;
+extern float		g_fJumpScale;
+extern float		fJumpScaleDefault;
 																//control to drop object.
 
 //	Things that pelvises do... Actually the functions in Pelvis.cpp...

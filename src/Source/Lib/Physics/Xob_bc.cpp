@@ -3736,7 +3736,16 @@ const float		lag_mult = .1;
 const float		lag_max = .003;//.001;
 int count = 0;
 			while (1) {
-
+				if (!_finite(L))
+				{
+					conPhysics << "FINITY BAILOUT IN XOB_BC FOR L: " << L << "\n";
+					// Incomplete workaround: substitute a valid, normalised vector.
+					State[3][0] = 0.25f;
+					State[4][0] = 0.25f;
+					State[5][0] = 0.25f;
+					State[6][0] = 0.25f;
+					break;
+				}
 
 				if ( fabs(L) < lag_max ) break;
 
