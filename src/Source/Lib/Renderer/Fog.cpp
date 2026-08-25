@@ -492,3 +492,10 @@ extern bool        bUseOutputFiles;
 CFog fogFog;
 CFog fogTerrainFog(iNUM_TERRAIN_FOG_BANDS);
 
+// ATX-style fog override (read from config at InitSurface, applied in CSetFogAction::Start).
+// When OverrideGameFogValues=1, the level script's fog power/half are replaced by the
+// forced values below (absolute, in normalised camera space).
+bool   g_bOverrideGameFog   = false;
+float  g_fFogPowerForced    = 0.0f;
+float  g_fFogHalfForced     = 0.0f;
+

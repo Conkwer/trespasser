@@ -117,9 +117,12 @@
 #include "Lib/EntityDBase/Query/QTerrain.hpp"
 #include "Game/DesignDaemon/Player.hpp"
 
-// Input buffer window (seconds): how long a jump request stays valid after the
-// key press before being discarded if the player never lands.
-static const float kfJumpBufferTime = 0.15f;
+// Input buffer window (seconds): how long a jump request stays valid after the key press.
+// Arcade mode latches until landing (ATX/CE feel — press in the air, fires on landing), so
+// 5s covers any realistic hop/fall. Legacy mode (legacyjumpgate=1 or jump scale > 1.2) keeps
+// the original short race window so repeated presses on a long jump don't accumulate.
+static const float kfJumpBufferTimeArcade = 5.0f;
+static const float kfJumpBufferTimeLegacy = 0.15f;
 #include "Lib/Std/LocalArray.hpp"
 
 // Debugging rendering stuff.
@@ -455,7 +458,8 @@ extern int	 iKontrol_Jump[NUM_PELVISES];
 			// Buffer the jump for a short real-time window so it survives the
 			// one-shot timing race at high FPS (otherwise the else-branch below
 			// cancels the impulse before the physics has a chance to consume it).
-			fJumpBufferUntil = CMessageStep::sElapsedRealTime + kfJumpBufferTime;
+			fJumpBufferUntil = CMessageStep::sElapsedRealTime +
+				(bJumpUsesLegacyBehavior() ? kfJumpBufferTimeLegacy : kfJumpBufferTimeArcade);
 		}
 		else if (!Pelvis_Jump_Voluntary || CMessageStep::sElapsedRealTime >= fJumpBufferUntil)
 		{

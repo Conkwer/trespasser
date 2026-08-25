@@ -237,6 +237,7 @@ CVector3<> v3GetCameraPos
 //
 // Global variables.
 //
+extern float g_fMinDistanceToCache;		// Object "clarity" render-cache distance (ObjectClarityDrawDistance).
 extern TPPartitionList ppartlistMoved;		// List of moving partitions.
 extern TPPartitionList ppartlistStopped;	// List of stopped partitions.
 

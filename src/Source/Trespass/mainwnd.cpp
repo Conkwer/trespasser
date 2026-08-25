@@ -23,6 +23,9 @@
 #include "tpassglobals.h"
 #include "..\Lib\Sys\reg.h"
 #include "..\lib\sys\reginit.hpp"
+#include "..\Lib\GeomDBase\PartitionPriv.hpp"
+#include "..\Lib\Renderer\Fog.hpp"
+#include "..\Lib\Renderer\RenderCacheHelp.hpp"
 #include "..\Lib\Audio\BackgroundMusic.hpp"
 #include "uiwnd.h"
 #include "uidlgs.h"
@@ -67,10 +70,41 @@ BOOL CMainWnd::InitSurface()
 
     CAudioDaemon::SetDataPath(szSource);
 
-    // Init the jump multiplier from config: legacyjump=1 restores the vanilla 4.0 jump.
+    // Init the jump multiplier from config: jumpscale=<float> sets it directly,
+    // legacyjump=1 restores the vanilla 4.0 jump, default is 1.0.
     extern float g_fJumpScale;
-    extern float fJumpScaleDefault;
-    g_fJumpScale = GetModValue("legacyjump", 0) ? 1.0f : fJumpScaleDefault;
+    extern float fGetConfiguredJumpScale();
+    extern bool g_bNoFallDamage;
+    g_fJumpScale = fGetConfiguredJumpScale();
+    // A config jump high enough to be lethal on landing gets the same fall-damage
+    // immunity as the JUMP cheat (>1.8) and the FAST/FASTER cheats.
+    g_bNoFallDamage = (g_fJumpScale > 1.8f);
+
+    // Relaxed jump gate (any-surface contact + coyote window) is default;
+    // legacyjumpgate=1 restores the strict 1.0 gate (shallow slope only).
+    extern bool g_bLegacyJumpGate;
+    g_bLegacyJumpGate = (GetModValue("legacyjumpgate", 0) != 0);
+
+    // Draw distance: distance at which an object of maximum radius is culled
+    // (vanilla 800). DrawDistance=<float> overrides it, like ATX's draw-dist slider.
+    SPartitionSettings::SetCullMaxAtDistance(GetModFloat("DrawDistance", 800.0f));
+
+    // ATX-style fog override: the object-cull distance (above) is usually hidden by the
+    // per-level fog, so to actually SEE further, override it. OverrideGameFogValues=1 +
+    // FogPowerForcedValue/FogHalfForcedValue force the level's fog power/half (absolute,
+    // normalised camera space: FogHalfForcedValue ~0.8 = fog pushed to the far clip).
+    extern bool  g_bOverrideGameFog;
+    extern float g_fFogPowerForced;
+    extern float g_fFogHalfForced;
+    g_bOverrideGameFog = (GetModValue("OverrideGameFogValues", 0) != 0);
+    g_fFogPowerForced  = GetModFloat("FogPowerForcedValue", 0.0f);
+    g_fFogHalfForced   = GetModFloat("FogHalfForcedValue", 0.0f);
+
+    // Object "clarity" draw distance (ATX: ObjectClarityDrawDistance, exe default 15): how far
+    // objects render live before being drawn from the pre-rendered cache ("pictures"). Raise it
+    // (e.g. 100) to stop objects swapping to cached images so close to the player.
+    extern float g_fMinDistanceToCache;
+    g_fMinDistanceToCache = GetModFloat("ObjectClarityDrawDistance", 15.0f);
 
 	// Create the main palette if there isn't one.
     if (!pcdbMain.ppalMain)

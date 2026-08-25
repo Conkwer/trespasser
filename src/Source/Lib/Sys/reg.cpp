@@ -301,6 +301,20 @@ int GetModValue(LPCSTR lpszVal, int nDefault)
 	return GetPrivateProfileInt(g_pszModSection, lpszVal, nDefault, g_szConfigPath);
 }
 
+float GetModFloat(LPCSTR lpszVal, float fDefault)
+{
+	char szDefault[64];
+	sprintf(szDefault, "%f", fDefault);
+
+	char szVal[64];
+	GetPrivateProfileString(g_pszModSection, lpszVal, szDefault, szVal, sizeof(szVal), g_szConfigPath);
+
+	float fResult;
+	if (sscanf(szVal, "%f", &fResult) != 1)
+		return fDefault;
+	return fResult;
+}
+
 void SetModString(LPCSTR lpszVal, LPCSTR lpszString)
 {
 	WritePrivateProfileString(g_pszModSection, lpszVal, lpszString, g_szConfigPath);

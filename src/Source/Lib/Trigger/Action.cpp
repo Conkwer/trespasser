@@ -1246,7 +1246,8 @@ void CSetFogAction::Start
 	//
 	if (u4SetFlags & ACTION_FOG_FLAG_SET_POWER)
 	{
-		fogprop.rPower = fFogPower;
+		// ATX-style override: OverrideGameFogValues=1 replaces the level's fog power.
+		fogprop.rPower = g_bOverrideGameFog ? g_fFogPowerForced : fFogPower;
 	}
 
 	//
@@ -1254,7 +1255,9 @@ void CSetFogAction::Start
 	//
 	if (u4SetFlags & ACTION_FOG_FLAG_SET_HALF)
 	{
-		fogprop.rHalfFogY = fFogHalf;
+		// ATX-style override: OverrideGameFogValues=1 replaces the level's fog half
+		// distance (normalised camera space: 0.8 = pushed to the far clip).
+		fogprop.rHalfFogY = g_bOverrideGameFog ? g_fFogHalfForced : fFogHalf;
 	}
 
 	//

@@ -748,7 +748,7 @@ float	Phi_X = 0,
 		if ( gd <-MAX_RENORM ) { gd =-MAX_RENORM; scrub_state( ad, bd, gd, a0, a1, a2, a3 ); }
 
 
-#define MAX_LINEAR 13*13
+#define MAX_LINEAR 20*20
 		float velcheck = ( State[0][1]*State[0][1] + State[1][1]*State[1][1] + State[2][1]*State[2][1] );
 		if (velcheck > MAX_LINEAR)
 		{

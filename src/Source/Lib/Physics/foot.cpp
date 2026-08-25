@@ -23,9 +23,37 @@ float	Pelvis_Set_Crouch = -100;
 float	Pelvis_Jump[3];
 bool	Pelvis_Jump_Voluntary;
 float	fJumpBufferUntil = -1.0f;
-float	g_fJumpScale = 1.0f;      // active jump velocity multiplier (JUMP cheat / legacyjump config)
-float	fJumpScaleDefault = 1.16f; // improved default jump multiplier (matches 1.1 feel)
+float	g_fJumpScale = 1.0f;      // active jump velocity multiplier (JUMP cheat / jumpscale config)
+float	fJumpScaleDefault = 1.0f;  // default jump multiplier (vanilla 1.1 feel; 1.16 felt too high)
+bool	g_bLegacyJumpGate = false; // legacyjumpgate=1 restores the strict 1.0 jump gate
 bool	bIsLimp[NUM_PELVISES];
+
+// Jump multiplier configured at startup / cheat-restore:
+//   jumpscale=<float>   sets the multiplier directly (jumpscale=1.3, 2.0, ...)
+//   legacyjump=1        restores the vanilla 4.0 jump (multiplier 1.0)
+//   otherwise           the improved default fJumpScaleDefault.
+// Uses plain const char* decls to avoid dragging windows.h/reg.h types here.
+extern int   GetModValue(const char* lpszVal, int nDefault);
+extern float GetModFloat(const char* lpszVal, float fDefault);
+float fGetConfiguredJumpScale()
+{
+	float f = GetModFloat("jumpscale", 0.0f);
+	if (f > 0.0f)
+		return f;
+	return GetModValue("legacyjump", 0) ? 1.0f : fJumpScaleDefault;
+}
+
+// Jump scale above which the "arcade" latch would let repeated presses accumulate during the
+// long airtime — force the legacy (strict gate + short buffer) instead. 1.0 is standard.
+const float kfJumpScaleLegacyThreshold = 1.2f;
+
+// Legacy jump = the original 1.0 behavior (strict ground gate, no latch-until-landing).
+// Arcade jump = the 1.1/ATX/CE-style relaxed gate + latch until landing. Chosen by config
+// (legacyjumpgate=1) OR automatically when the jump scale is high (>1.2, i.e. cheats).
+bool bJumpUsesLegacyBehavior()
+{
+	return g_bLegacyJumpGate || (g_fJumpScale > kfJumpScaleLegacyThreshold);
+}
 CSet<int> asFootLatch[NUM_PELVISES];
 
 #define LEFT_FOOT_LATCH 1
@@ -1307,16 +1335,19 @@ extern bool	OKtoJUMP;
 
 		if (Pel_Usage[pelvis] == epelHUMAN)
 		{
+			// Jump gate. Default (relaxed): fire when the foot is in contact on any walkable
+			// surface (slope < ~57°, slohp < 0.7) or the constraint solver reports a ground
+			// normal (OKtoJUMP). legacyjumpgate=1 restores the strict 1.0 gate (slohp < 0.31).
+			// No coyote window: it let the jump re-fire while barely in contact right after a
+			// launch (Anne never cleanly separated -> "stuck in the ground"). The 150ms input
+			// buffer already covers press timing, so a ground-side grace window isn't needed.
+			bool bCanJump = bJumpUsesLegacyBehavior()
+				? ( ( (Xob[feetwet].Wz != 0) && (slohp < .31) ) || (OKtoJUMP) )
+				: ( ( (Xob[feetwet].Wz != 0) && (slohp < .7) ) || (OKtoJUMP) );
 
 			if ( (Pelvis_Jump[2]) && (Pel_Data[pelvis][49]>0) )
 			{
-				//if ( (Xob[feetwet].Wz != 0) && ((slohp < .31) || ( Xob[feetwet].bHitAnother )) )
-				//if ( (Xob[feetwet].bHitAnother) && (fabs( rat ) > 1) )
-
-				if (   ( (Xob[feetwet].Wz != 0) && (slohp < .31) )
-					|| ( OKtoJUMP )
-				   )
-				
+				if (bCanJump)
 				{
 					Pel[pelvis][(RIGHT_FOOT+0)][1] = Pel[pelvis][(BODY+0)][1] += 4 * Pelvis_Jump[0] * g_fJumpScale;
 					Pel[pelvis][(RIGHT_FOOT+1)][1] = Pel[pelvis][(BODY+1)][1] += 4 * Pelvis_Jump[1] * g_fJumpScale;

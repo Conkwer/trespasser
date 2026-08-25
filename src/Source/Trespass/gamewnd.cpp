@@ -97,7 +97,7 @@ int g_icCheats = sizeof(CHEATS) / sizeof(CHEATS[0]);
 
 
 extern float g_fJumpScale;
-extern float fJumpScaleDefault;
+extern float fGetConfiguredJumpScale();
 extern bool g_bNoFallDamage;
 
 bool ExecuteCheat(LPSTR pszCheat)
@@ -265,7 +265,7 @@ bool ExecuteCheat(LPSTR pszCheat)
 				else
 				{
 					CMessageStep::sMultiplier = 1.0f;
-					g_fJumpScale = GetModValue("legacyjump", 0) ? 1.0f : fJumpScaleDefault;
+					g_fJumpScale = fGetConfiguredJumpScale();
 					g_bNoFallDamage = false;
 				}
 			}
@@ -287,7 +287,14 @@ bool ExecuteCheat(LPSTR pszCheat)
 			{
 				float f;
 				if (sscanf(psz, "%f", &f) == 1)
+				{
+					// Physics falls apart beyond ~20x; clamp to a sane max.
+					if (f > 15.0f) f = 15.0f;
 					g_fJumpScale = f;
+					// High jumps would kill Anne on landing — grant the same
+					// fall-damage immunity as FAST/FASTER so JUMP is playable.
+					g_bNoFallDamage = (f > 1.8f);
+				}
 			}
 			break;
 		case CHEAT_FAST:
@@ -295,13 +302,13 @@ bool ExecuteCheat(LPSTR pszCheat)
 				if (CMessageStep::sMultiplier == 1.0f)
 				{
 					CMessageStep::sMultiplier = 1.5f;	// 1.5x game speed
-					g_fJumpScale = 2.0f;				// 2x jump
+					g_fJumpScale = 3.0f;				// 3x jump (same as FASTER)
 					g_bNoFallDamage = true;			// don't die on landing
 				}
 				else
 				{
 					CMessageStep::sMultiplier = 1.0f;
-					g_fJumpScale = GetModValue("legacyjump", 0) ? 1.0f : fJumpScaleDefault;
+					g_fJumpScale = fGetConfiguredJumpScale();
 					g_bNoFallDamage = false;
 				}
 			}

@@ -129,7 +129,10 @@
 // Macros and constants.
 //
 
-const float fMinDistanceToCache = 15.0f;
+// Object "clarity" render-cache distance (ATX: ObjectClarityDrawDistance, exe default 15.0).
+// Objects beyond (this * cache multiplier) are drawn from a pre-rendered cache ("pictures")
+// instead of live geometry. Configurable so the user can push the picture swap out.
+float g_fMinDistanceToCache = 15.0f;
 
 // One.
 const float fOne = 1.0f;
@@ -214,7 +217,7 @@ bool bShouldCache(CPartition* ppart, const CCamera& cam, float f_distance_sqr,
 	{
 		Assert(f_distance_sqr > 0.0f);
 		float f_dist     = fSqrtEst(f_distance_sqr) + ppart->rGetCylinderRadius();
-		float f_min_dist = fMinDistanceToCache * f_cache_multiplier;
+		float f_min_dist = g_fMinDistanceToCache * f_cache_multiplier;
 
 		// Is the cache at or beyond the minimum distance.
 		if (u4FromFloat(f_dist) < u4FromFloat(f_min_dist))

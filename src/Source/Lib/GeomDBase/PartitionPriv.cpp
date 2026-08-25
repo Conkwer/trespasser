@@ -89,7 +89,7 @@ const float fMaxCullingDistanceShadow = 200.0f;
 								(fCullMaxAtDistance * qdQualitySettings[iGetQualitySetting()].fCullDistScale)
 								/ fMaxRadius;
 
-		SetMinMax(f_cull_distance, fMinCullingDistance, fMaxCullingDistance);
+		SetMinMax(f_cull_distance, fMinCullingDistance, Max(fMaxCullingDistance, fCullMaxAtDistance));
 
 		return f_cull_distance;
 	}

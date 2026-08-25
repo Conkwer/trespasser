@@ -96,6 +96,9 @@ extern bool		Pelvis_Jump_Voluntary;
 extern float		fJumpBufferUntil;
 extern float		g_fJumpScale;
 extern float		fJumpScaleDefault;
+extern float		fGetConfiguredJumpScale();
+extern bool			bJumpUsesLegacyBehavior();
+extern bool			g_bLegacyJumpGate;
 																//control to drop object.
 
 //	Things that pelvises do... Actually the functions in Pelvis.cpp...

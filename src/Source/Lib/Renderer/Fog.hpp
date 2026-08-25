@@ -613,5 +613,8 @@ private:
 // Global fog objects.
 extern CFog fogFog;
 extern CFog fogTerrainFog;
+extern bool   g_bOverrideGameFog;
+extern float  g_fFogPowerForced;
+extern float  g_fFogHalfForced;
 
 #endif
