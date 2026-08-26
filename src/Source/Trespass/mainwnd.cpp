@@ -97,8 +97,8 @@ BOOL CMainWnd::InitSurface()
     extern float g_fFogPowerForced;
     extern float g_fFogHalfForced;
     g_bOverrideGameFog = (GetModValue("OverrideGameFogValues", 0) != 0);
-    g_fFogPowerForced  = GetModFloat("FogPowerForcedValue", 0.0f);
-    g_fFogHalfForced   = GetModFloat("FogHalfForcedValue", 0.0f);
+    g_fFogPowerForced  = GetModFloat("FogPowerForcedValue", 2.0f);
+    g_fFogHalfForced   = GetModFloat("FogHalfForcedValue", 0.9f);
 
     // Object "clarity" draw distance (ATX: ObjectClarityDrawDistance, exe default 15): how far
     // objects render live before being drawn from the pre-rendered cache ("pictures"). Raise it
