@@ -53,8 +53,9 @@ static void WriteDefaults()
 		0x44,0x00,0x00,0x00,0x00,0x00,0x00,0x10
 	};
 
-	SetRegString(REG_KEY_DATA_DRIVE,        ".\\");
-	SetRegString(REG_KEY_INSTALLED_DIR,     ".\\");
+	// Single modern path override: folder that contains the game's data\ tree.
+	// Default ".\\" = next to the exe (SetProperWorkingDir pins the CWD there).
+	SetModString(REG_KEY_DATA_PATH, ".\\");
 
 	SetRegValue(REG_KEY_INSTALLED,            1);
 	SetRegValue(REG_KEY_SAFEMODE,             0);
@@ -90,7 +91,6 @@ static void WriteDefaults()
 	SetModValue("EnableBackgroundMusic",        1);
 	SetModValue(REG_KEY_SHUFFLE,              DEFAULT_SHUFFLE);
 	SetModValue(REG_KEY_HARDCORE,             DEFAULT_HARDCORE);
-	SetModValue(REG_KEY_LOGGING,             DEFAULT_LOGGING);
 	SetModValue(REG_KEY_RANDOMIZATION,       DEFAULT_RANDOMIZATION);
 	SetModValue(REG_KEY_TUTORIALS,           DEFAULT_TUTORIALS);
 	SetModValue(REG_KEY_DEBUG,               DEFAULT_DEBUG);

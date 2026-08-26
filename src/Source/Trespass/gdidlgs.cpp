@@ -162,7 +162,7 @@ BOOL CGDIMain::OnInitDialog(HWND hwnd, HWND hwndFocus, LPARAM lParam)
 
     // BUGBUG:  Hack to get data drive location
     GetRegString(REG_KEY_INSTALLED_DIR, szFile, sizeof(szFile), "");
-    if (szFile[strlen(szFile) - 1] != '\\')
+    if (szFile[0] && szFile[strlen(szFile) - 1] != '\\')
     {
         strcat(szFile, "\\");
     }
@@ -437,7 +437,7 @@ BOOL CSaveGameDlg::OnInitDialog(HWND hwnd, HWND hwndFocus, LPARAM lParam)
     char            szFile[_MAX_PATH];
 
     GetRegString(REG_KEY_INSTALLED_DIR, szFile, sizeof(szFile), "");
-    if (szFile[strlen(szFile)] != '\\')
+    if (szFile[0] && szFile[strlen(szFile) - 1] != '\\')
     {
         strcat(szFile, "\\");
     }
@@ -598,7 +598,7 @@ BOOL CLoadGameDlg::OnInitDialog(HWND hwnd, HWND hwndFocus, LPARAM lParam)
     char            szFile[_MAX_PATH];
 
     GetRegString(REG_KEY_INSTALLED_DIR, szFile, sizeof(szFile), "");
-    if (szFile[strlen(szFile)] != '\\')
+    if (szFile[0] && szFile[strlen(szFile) - 1] != '\\')
     {
         strcat(szFile, "\\");
     }
@@ -704,7 +704,7 @@ BOOL CLoadGameDlg::LoadLevel(LPCSTR pszName)
 
     // BUGBUG:  Hack to get data drive location
     GetRegString(REG_KEY_INSTALLED_DIR, szFile, sizeof(szFile), "");
-    if (szFile[strlen(szFile)] != '\\')
+    if (szFile[0] && szFile[strlen(szFile) - 1] != '\\')
     {
         strcat(szFile, "\\");
     }

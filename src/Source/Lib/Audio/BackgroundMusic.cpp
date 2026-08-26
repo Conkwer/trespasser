@@ -13,6 +13,7 @@
 #include "BackgroundMusic.hpp"
 #include "..\Sys\reg.h"
 #include "..\Sys\RegInit.hpp"
+#include "..\Sys\DebugConsole.hpp"
 
 extern HWND g_hwnd;
 
@@ -23,16 +24,12 @@ static bool                g_bHaveDS = false;
 
 static void BgmLog(const char* fmt, ...)
 {
-	// Skip logging unless enabled in [TrespasserPlus]
-	if (!GetModValue("Logging", 0))
-		return;
-
-	FILE* f = fopen("bgmusic.log", "a");
-	if (f) {
-		va_list a; va_start(a, fmt);
-		vfprintf(f, fmt, a); va_end(a);
-		fprintf(f, "\n"); fclose(f);
-	}
+	// Written to DebugLog.txt (only emitted when Debug=1 in the config).
+	char buf[512];
+	va_list a; va_start(a, fmt);
+	vsprintf(buf, fmt, a); va_end(a);
+	strcat(buf, "\n");
+	dprint(buf);
 }
 
 // --- IMA ADPCM decoder tables (same as AudioADPCM.cpp) ---

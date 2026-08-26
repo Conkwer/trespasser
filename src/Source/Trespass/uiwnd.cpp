@@ -839,7 +839,7 @@ BOOL CUIWnd::LoadWindowInfo()
 
     //The Hack's hack to try and find the file first in the installed dir
     GetRegString(REG_KEY_INSTALLED_DIR, szFile, sizeof(szFile), "");
-    if (szFile[strlen(szFile) - 1] != '\\')
+    if (szFile[0] && szFile[strlen(szFile) - 1] != '\\')
     {
         strcat(szFile, "\\");
     }
@@ -862,7 +862,7 @@ BOOL CUIWnd::LoadWindowInfo()
 
         // BUGBUG:  Hack to get data drive location
         GetRegString(REG_KEY_DATA_DRIVE, szFile, sizeof(szFile), "");
-        if (szFile[strlen(szFile) - 1] != '\\')
+        if (szFile[0] && szFile[strlen(szFile) - 1] != '\\')
         {
             strcat(szFile, "\\");
         }
