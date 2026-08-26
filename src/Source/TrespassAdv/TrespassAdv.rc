@@ -78,7 +78,7 @@ CAPTION "About Advanced Trespasser Options"
 FONT 8, "MS Sans Serif"
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,20,12,18,20
-    LTEXT           "Advanced Trespasser Options\nCopyright © 1998 by Dreamworks Interactive",
+    LTEXT           "Advanced Trespasser Options\nCopyright (C) 1998 by Dreamworks Interactive",
                     IDC_STATIC,52,12,112,24,SS_NOPREFIX
     DEFPUSHBUTTON   "OK",IDOK,64,111,56,14,WS_GROUP
     CTEXT           "This application is provided for advance users wishing to experiment with unsupported hardware. It is provided ""as is"" with no official support or implied warrantee.",
@@ -183,7 +183,7 @@ BEGIN
             VALUE "FileDescription", "Trespasser Advanced Options\0"
             VALUE "FileVersion", "1, 0, 0, 1\0"
             VALUE "InternalName", "TRESPASSADV\0"
-            VALUE "LegalCopyright", "Copyright © 1998 by Dreamworks Interactive\0"
+            VALUE "LegalCopyright", "Copyright (C) 1998 by Dreamworks Interactive\0"
             VALUE "OriginalFilename", "TRESPASSADV.EXE\0"
             VALUE "ProductName", "TRESPASSADV Application\0"
             VALUE "ProductVersion", "1, 0, 0, 1\0"

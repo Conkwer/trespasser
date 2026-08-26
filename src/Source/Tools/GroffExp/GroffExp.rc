@@ -98,9 +98,9 @@ BEGIN
             VALUE "FileDescription", "GroffExp\0"
             VALUE "FileVersion", "1, 1, 4, 0\0"
             VALUE "InternalName", "GroffExp\0"
-            VALUE "LegalCopyright", "Copyright © 1996, 1997 DreamWorks Interactive\0"
+            VALUE "LegalCopyright", "Copyright (C) 1996, 1997 DreamWorks Interactive\0"
             VALUE "OriginalFilename", "GroffExp.dle\0"
-            VALUE "ProductName", "GroffExp.dle - Jurassic Park II - Trespasser. Copyright © 1996, 1997 DreamWorks Interactive\0"
+            VALUE "ProductName", "GroffExp.dle - Jurassic Park II - Trespasser. Copyright (C) 1996, 1997 DreamWorks Interactive\0"
             VALUE "ProductVersion", "1, 1, 4, 0\0"
         END
     END

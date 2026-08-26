@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright (C) DreamWorks Interactive. 1997
  *
  * Contents:
  *		'Global' static data declarations for the wavelet multiresolution classes.

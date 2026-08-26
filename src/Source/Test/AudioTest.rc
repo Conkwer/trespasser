@@ -196,7 +196,7 @@ BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,11,17,20,20
     LTEXT           "AudioTest Version 1.0",IDC_STATIC,40,10,119,8,
                     SS_NOPREFIX
-    LTEXT           "Copyright © 1996",IDC_STATIC,40,25,119,8
+    LTEXT           "Copyright (C) 1996",IDC_STATIC,40,25,119,8
     DEFPUSHBUTTON   "OK",IDOK,178,7,32,14,WS_GROUP
 END
 
@@ -342,7 +342,7 @@ BEGIN
             VALUE "FileDescription", "AUDIOTEST MFC Application\0"
             VALUE "FileVersion", "1, 0, 0, 1\0"
             VALUE "InternalName", "AUDIOTEST\0"
-            VALUE "LegalCopyright", "Copyright © 1996\0"
+            VALUE "LegalCopyright", "Copyright (C) 1996\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "AUDIOTEST.EXE\0"
             VALUE "ProductName", "AUDIOTEST Application\0"

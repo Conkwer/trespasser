@@ -1,6 +1,6 @@
 /**********************************************************************************************
  *
- * Copyright © DreamWorks Interactive, 1998.
+ * Copyright (C) DreamWorks Interactive, 1998.
  *
  * Contents:
  *		Private classes used to allow opaque declarations for use with CPartition.

@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright (C) DreamWorks Interactive. 1997
  *
  * Implementation of support code for reading processor specific registers and performance
  * registers.

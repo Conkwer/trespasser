@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright (C) DreamWorks Interactive. 1997
  *
  * Contents:
  *		Classes describing the format of the binary wavelet transformed data.

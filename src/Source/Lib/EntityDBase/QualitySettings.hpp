@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1998
+ * Copyright (C) DreamWorks Interactive. 1998
  *
  * Quality settings data declarations.
  *

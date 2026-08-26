@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright (C) DreamWorks Interactive. 1997
  *
  * Contents:
  *	Standard header file for sound library, this is required so that the audio library

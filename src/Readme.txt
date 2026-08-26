@@ -377,5 +377,5 @@ Trident:            www.tridentmicro.com
 Appendix B: Legal Notice
 -------------------------------------------------------------------------------
 
-©1998 DreamWorks Interactive L.L.C. All rights reserved.  DreamWorks Interactive is a trademark of DreamWorks L.L.C. The Lost World: Jurassic Park™ & © 1998 Universal City Studios, Inc. and Amblin Entertainment, Inc. Trespasser is a trademark of Universal City Studios, Inc. and Amblin Entertainment, Inc. Licensed by Universal Studios Licensing, Inc. All rights reserved. .Electronic Arts and the Electronic Arts logo are trademarks or registered trademarks of Electronic Arts in the U.S. and/or other countries.  All other trademarks are properties of their respective owners.  All rights reserved.
+(C)1998 DreamWorks Interactive L.L.C. All rights reserved.  DreamWorks Interactive is a trademark of DreamWorks L.L.C. The Lost World: Jurassic Park™ & (C) 1998 Universal City Studios, Inc. and Amblin Entertainment, Inc. Trespasser is a trademark of Universal City Studios, Inc. and Amblin Entertainment, Inc. Licensed by Universal Studios Licensing, Inc. All rights reserved. .Electronic Arts and the Electronic Arts logo are trademarks or registered trademarks of Electronic Arts in the U.S. and/or other countries.  All other trademarks are properties of their respective owners.  All rights reserved.
 

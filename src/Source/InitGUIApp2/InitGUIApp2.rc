@@ -115,7 +115,7 @@ BEGIN
             VALUE "FileDescription", "INITGUIAPP2 MFC Application\0"
             VALUE "FileVersion", "1, 0, 0, 1\0"
             VALUE "InternalName", "INITGUIAPP2\0"
-            VALUE "LegalCopyright", "Copyright © 1998\0"
+            VALUE "LegalCopyright", "Copyright (C) 1998\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "INITGUIAPP2.EXE\0"
             VALUE "ProductName", "INITGUIAPP2 Application\0"

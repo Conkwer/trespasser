@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive. 1997
+ * Copyright (C) DreamWorks Interactive. 1997
  *
  * Contents:
  *		Terrain query classes for the world database.

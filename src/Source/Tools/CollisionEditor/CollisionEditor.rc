@@ -282,7 +282,7 @@ BEGIN
             VALUE "FileDescription", "COLLISIONEDITOR MFC Application\0"
             VALUE "FileVersion", "1, 1, 7, 0\0"
             VALUE "InternalName", "COLLISIONEDITOR\0"
-            VALUE "LegalCopyright", "Copyright © 1996\0"
+            VALUE "LegalCopyright", "Copyright (C) 1996\0"
             VALUE "OriginalFilename", "COLLISIONEDITOR.EXE\0"
             VALUE "ProductName", "COLLISIONEDITOR Application\0"
             VALUE "ProductVersion", "1, 1, 7, 0\0"

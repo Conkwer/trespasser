@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive, 1998.
+ * Copyright (C) DreamWorks Interactive, 1998.
  *
  * Contents:
  *		Detects Direct3D video cards.

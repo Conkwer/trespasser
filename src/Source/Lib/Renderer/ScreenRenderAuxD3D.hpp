@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive, 1997.
+ * Copyright (C) DreamWorks Interactive, 1997.
  *
  * Contents:
  *		An auxilary D3D renderer to supplement CScreenRenderDWI.

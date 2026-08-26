@@ -1,5 +1,5 @@
 /**********************************************************************************************
- * Copyright © DreamWorks Interactive, 1996
+ * Copyright (C) DreamWorks Interactive, 1996
  *
  * Contents:
  *		Implementation of InfoBio.hpp

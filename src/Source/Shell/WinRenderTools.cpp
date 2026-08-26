@@ -1,6 +1,6 @@
 /**********************************************************************************************
  *
- * Copyright © DreamWorks Interactive, 1996
+ * Copyright (C) DreamWorks Interactive, 1996
  *
  * Implementation of 'WinRenderTools.hpp.'
  *

@@ -1,6 +1,6 @@
 /***********************************************************************************************
  *
- * Copyright © DreamWorks Interactive, 1997.
+ * Copyright (C) DreamWorks Interactive, 1997.
  *
  * Contents:
  *		Functions to test for 2D screen containment and intersection.
