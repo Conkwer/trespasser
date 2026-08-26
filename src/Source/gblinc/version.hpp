@@ -23,7 +23,7 @@
 
 #define BUILD_MAJOR     1
 #define BUILD_MINOR     0
-#define BUILD_NUM       122
+#define BUILD_NUM       123
 
 #define STR_BUILD_MAJOR prep_conv_str(BUILD_MAJOR)
 #define STR_BUILD_MINOR prep_conv_str(BUILD_MINOR)

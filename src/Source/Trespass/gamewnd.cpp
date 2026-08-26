@@ -100,6 +100,44 @@ extern float g_fJumpScale;
 extern float fGetConfiguredJumpScale();
 extern bool g_bNoFallDamage;
 
+// Per-cheat active state. SLOMO/FAST/FASTER previously all used
+// CMessageStep::sMultiplier as their toggle flag, so any one of them resetting
+// the shared multiplier (e.g. SLOMO toggling back to 1.0) left the jump scale
+// high while the speed was normal -- a later "FAST" then hit the ON branch again
+// instead of OFF, and the legacy (strict) jump stayed active. Each cheat now
+// tracks its own flag and the speed/jump state is recomputed from all of them,
+// so no cheat can desync another.
+static bool bCheatSlomo = false;
+static bool bCheatFast = false;
+static bool bCheatFaster = false;
+static float fJumpScaleCheat = 0.0f;   // JUMP <x> value; 0 = not set / reset
+
+static void RecomputeSpeedCheats()
+{
+    // Game speed: FASTER > FAST > SLOMO > normal.
+    if (bCheatFaster)
+        CMessageStep::sMultiplier = 2.0f;
+    else if (bCheatFast)
+        CMessageStep::sMultiplier = 1.5f;
+    else if (bCheatSlomo)
+        CMessageStep::sMultiplier = 0.30f;
+    else
+        CMessageStep::sMultiplier = 1.0f;
+
+    // Jump scale: speed cheats give a 3x jump; otherwise keep the JUMP-cheat value
+    // if one is set, else the configured scale. The JUMP cheat keeps its value so a
+    // FAST toggle doesn't silently wipe it.
+    if (bCheatFast || bCheatFaster)
+        g_fJumpScale = 3.0f;
+    else if (fJumpScaleCheat > 0.0f)
+        g_fJumpScale = fJumpScaleCheat;
+    else
+        g_fJumpScale = fGetConfiguredJumpScale();
+
+    // High jumps are lethal on landing -- grant the same fall-damage immunity as before.
+    g_bNoFallDamage = (g_fJumpScale > 1.8f);
+}
+
 bool ExecuteCheat(LPSTR pszCheat)
 {
     LPSTR   psz;
@@ -238,14 +276,8 @@ bool ExecuteCheat(LPSTR pszCheat)
 
         case CHEAT_SLOMO:
             {
-                if (CMessageStep::sMultiplier == 1.0f)
-                {
-                    CMessageStep::sMultiplier = 0.30f;
-                }
-                else
-                {
-                    CMessageStep::sMultiplier = 1.0f;
-                }
+                bCheatSlomo = !bCheatSlomo;
+                RecomputeSpeedCheats();
             }
             break;
 		case CHEAT_DINOS:
@@ -256,18 +288,8 @@ bool ExecuteCheat(LPSTR pszCheat)
 			break;
 		case CHEAT_FASTER:
 			{
-				if (CMessageStep::sMultiplier == 1.0f)
-				{
-					CMessageStep::sMultiplier = 2.0f;	// 2x game speed
-					g_fJumpScale = 3.0f;				// 3x jump
-					g_bNoFallDamage = true;			// don't die on landing
-				}
-				else
-				{
-					CMessageStep::sMultiplier = 1.0f;
-					g_fJumpScale = fGetConfiguredJumpScale();
-					g_bNoFallDamage = false;
-				}
+				bCheatFaster = !bCheatFaster;
+				RecomputeSpeedCheats();
 			}
 			break;
 		case CHEAT_SAVELOC:
@@ -286,31 +308,25 @@ bool ExecuteCheat(LPSTR pszCheat)
 		case CHEAT_JUMP:
 			{
 				float f;
-				if (sscanf(psz, "%f", &f) == 1)
+				if (psz && sscanf(psz, "%f", &f) == 1)
 				{
 					// Physics falls apart beyond ~20x; clamp to a sane max.
 					if (f > 15.0f) f = 15.0f;
-					g_fJumpScale = f;
-					// High jumps would kill Anne on landing — grant the same
-					// fall-damage immunity as FAST/FASTER so JUMP is playable.
-					g_bNoFallDamage = (f > 1.8f);
+					if (f < 0.0f) f = 0.0f;
+					fJumpScaleCheat = f;
 				}
+				else
+				{
+					// JUMP with no value: off switch -- restore the configured jump.
+					fJumpScaleCheat = 0.0f;
+				}
+				RecomputeSpeedCheats();
 			}
 			break;
 		case CHEAT_FAST:
 			{
-				if (CMessageStep::sMultiplier == 1.0f)
-				{
-					CMessageStep::sMultiplier = 1.5f;	// 1.5x game speed
-					g_fJumpScale = 3.0f;				// 3x jump (same as FASTER)
-					g_bNoFallDamage = true;			// don't die on landing
-				}
-				else
-				{
-					CMessageStep::sMultiplier = 1.0f;
-					g_fJumpScale = fGetConfiguredJumpScale();
-					g_bNoFallDamage = false;
-				}
+				bCheatFast = !bCheatFast;
+				RecomputeSpeedCheats();
 			}
 			break;
     }
