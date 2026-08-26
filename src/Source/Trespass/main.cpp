@@ -159,15 +159,41 @@ int GetModulePath(HINSTANCE hInst, LPSTR pszDst, int cch)
 
 void SetProperWorkingDir()
 {
-    char        szPath[_MAX_PATH];
+    char szPath[_MAX_PATH];
+    char szBase[_MAX_PATH];
 
-#if VER_TEST
-    GetRegString(REG_KEY_INSTALLED_DIR, szPath, sizeof(szPath), "");
-#else
     GetModulePath(g_hInst, szPath, sizeof(szPath));
-#endif
-	Trace(("%s", szPath));
-    SetCurrentDirectory(szPath);
+
+    // Highest priority: [TrespasserPlus] DataPath= override. A relative value is
+    // resolved against the exe's own folder, so a launcher's "Start in:" can't break it.
+    GetModString(REG_KEY_DATA_PATH, szBase, sizeof(szBase), "");
+    if (szBase[0])
+    {
+        if (szBase[1] != ':' && szBase[0] != '\\' && szBase[0] != '/')
+        {
+            char szRel[_MAX_PATH];
+            strcpy(szRel, szBase);
+            wsprintf(szBase, "%s%s", szPath, szRel);
+        }
+    }
+    else
+    {
+        // Backward compat with CD installs: honor an absolute, existing "Installed Directory".
+        GetRegString(REG_KEY_INSTALLED_DIR, szBase, sizeof(szBase), "");
+        if (szBase[0])
+        {
+            if (szBase[1] != ':' && szBase[0] != '\\')
+                szBase[0] = '\0';               // relative — ignore, fall back to exe dir
+            else if (GetFileAttributes(szBase) == (DWORD)-1)
+                szBase[0] = '\0';               // absolute but missing — fall back to exe dir
+        }
+    }
+
+    if (!szBase[0])
+        strcpy(szBase, szPath);
+
+    SetCurrentDirectory(szBase);
+    Trace(("SetProperWorkingDir: %s", szBase));
 }
 
 
@@ -507,30 +533,28 @@ int DoWinMain(HINSTANCE hInstance,
     }
 
 	// Check existance of file system
-CheckFS:
     {
         char    sz[_MAX_PATH];
 
         GetFileLoc(FA_DATADRIVE, sz, sizeof(sz));
         strcat(sz, "menu\\tpassintro.smk");
 
-        // This should be the unique file on the disk
+        // This should be the unique file on the disk. No infinite retry loop: on failure
+        // show the resolved absolute path once, then exit, so the game can't get stuck
+        // demanding a CD.
         if (GetFileAttributes(sz) == (DWORD)-1)
         {
-            GetRegString(REG_KEY_DATA_DRIVE, sz, sizeof(sz), "");
+            char szFull[_MAX_PATH];
+            if (!GetFullPathName(sz, sizeof(szFull), szFull, NULL))
+                lstrcpy(szFull, sz);
+            Trace(("CheckFS: data not found at %s", szFull));
 
-            if (MsgDlg(g_hwnd, 
-                       MB_OKCANCEL | MB_SETFOREGROUND, 
-                       IDS_ERROR_TITLE, 
-                       IDS_DATA_DRIVE_NOT_FOUND,
-                       sz) == IDCANCEL)
-            {
-                Trace(("We are Canceling from no data found"));
-                goto Cleanup;
-            }
-
-            SleepEx(1000, FALSE);
-            goto CheckFS;
+            MsgDlg(g_hwnd,
+                   MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND,
+                   IDS_ERROR_TITLE,
+                   IDS_DATA_DRIVE_NOT_FOUND,
+                   szFull);
+            goto Cleanup;
         }
     }
 

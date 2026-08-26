@@ -1,10 +1,20 @@
 #include "IniFile.hpp"
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 void InitDefaultConfigPath()
 {
-	lstrcpy(g_szConfigPath, ".\\trespass.cfg");
+	// Resolve the config path relative to the exe's own folder, not the CWD, so the
+	// game finds trespass.cfg no matter where the launcher sets the working directory.
+	extern HINSTANCE g_hInst;
+	char szExe[_MAX_PATH];
+	char szDrive[_MAX_DRIVE];
+	char szDir[_MAX_DIR];
+
+	GetModuleFileName(g_hInst, szExe, sizeof(szExe));
+	_splitpath(szExe, szDrive, szDir, NULL, NULL);
+	wsprintf(g_szConfigPath, "%s%s%s", szDrive, szDir, "trespass.cfg");
 }
 
 char g_szConfigPath[MAX_PATH] = "";

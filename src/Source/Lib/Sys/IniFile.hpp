@@ -28,7 +28,7 @@ private:
 	char m_szSection[128];
 };
 
-// Global config file path, set by CLI -config or defaults to .\trespass.cfg
+// Global config file path, set by CLI -config or defaults to <exe dir>\trespass.cfg
 extern char g_szConfigPath[MAX_PATH];
 
 // Initialize g_szConfigPath with default file (trespass.cfg or trespass.ini)

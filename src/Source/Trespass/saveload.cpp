@@ -577,10 +577,6 @@ void CSaveGameWnd::ActualSave()
     int             iLen;
     SAVEGAMEINFO *  psgi;
     LPSTR           pszExt;
-    DWORD           dwSectorsPerCluster;
-    DWORD           dwBytesPerSector;
-    DWORD           dwFreeClusters;
-    DWORD           dwTotalClusters;
 
     psz = m_pGameName->GetText();
     if (psz)
@@ -603,19 +599,16 @@ void CSaveGameWnd::ActualSave()
         GetFileLoc(FA_INSTALLDIR, szFName, sizeof(szFName));
         _splitpath(szFName, szExt, NULL,NULL, NULL);
         strcat(szExt, "\\");
-        bValidName = GetDiskFreeSpace(szExt,
-                                      &dwSectorsPerCluster,
-                                      &dwBytesPerSector,
-                                      &dwFreeClusters,
-                                      &dwTotalClusters);
+        ULARGE_INTEGER ulFreeBytes, ulTotalBytes, ulTotalFreeBytes;
+        bValidName = GetDiskFreeSpaceEx(szExt, &ulFreeBytes, &ulTotalBytes, &ulTotalFreeBytes);
         if (!bValidName)
         {
-            Trace(("CSaveGameWnd::ActualSave() -- GetFreeDiskSpace error %i", 
+            Trace(("CSaveGameWnd::ActualSave() -- GetFreeDiskSpace error %i",
                    GetLastError()));
         }
 
-        // Check for enough free space for a save
-        if (dwSectorsPerCluster * dwBytesPerSector * dwFreeClusters < 1024 * 1024)
+        // Check for enough free space for a save (64-bit — works on large drives)
+        if (ulFreeBytes.QuadPart < (ULONGLONG)1024 * 1024)
         {
             CMsgOkDlg   dlg(IDS_ERROR_DISKSPACE_SAVE, m_pUIMgr);
 

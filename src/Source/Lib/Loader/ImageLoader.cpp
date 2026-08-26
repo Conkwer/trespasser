@@ -685,21 +685,14 @@ bool CLoadImageDirectory::bProcessLocalSwapFile
     //
     {
         char    szDrive[50];
-        uint32  u4SectorsPerCluster;
-        uint32  u4BytesPerSector;
-        uint32  u4FreeClusters;
-        uint32  u4TotalClusters;
+        ULARGE_INTEGER ulFreeBytes, ulTotalBytes, ulTotalFreeBytes;
 
         _splitpath(strLocalImage, szDrive, NULL, NULL, NULL);
         strcat(szDrive, "\\");
 
-        GetDiskFreeSpace(szDrive,
-                         (unsigned long *)&u4SectorsPerCluster,
-                         (unsigned long *)&u4BytesPerSector,
-                         (unsigned long *)&u4FreeClusters,
-                         (unsigned long *)&u4TotalClusters);
-        // Check for enough free space for a save
-        if (u4SectorsPerCluster * u4BytesPerSector * u4FreeClusters < u4LocalImageSize)
+        GetDiskFreeSpaceEx(szDrive, &ulFreeBytes, &ulTotalBytes, &ulTotalFreeBytes);
+        // Check for enough free space for a save (64-bit — works on large drives)
+        if (ulFreeBytes.QuadPart < (ULONGLONG)u4LocalImageSize)
         {
             i4Error = -2;
 			SetEvent(hCopyLocal);

@@ -84,6 +84,7 @@
 #define REG_KEY_DATA_DRIVE          "Data Drive"
 #define REG_KEY_INSTALLED           "Installed"
 #define REG_KEY_INSTALLED_DIR       "Installed Directory"
+#define REG_KEY_DATA_PATH           "DataPath"
 #define REG_KEY_NOVIDEO             "NoVideo"
 #define REG_KEY_AUDIO_LEVEL         "AudioLevel"
 #define REG_KEY_AUDIO_EFFECT        "PlaySFX"
