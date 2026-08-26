@@ -608,7 +608,7 @@ void CSaveGameWnd::ActualSave()
         }
 
         // Check for enough free space for a save (64-bit — works on large drives)
-        if (ulFreeBytes.QuadPart < (ULONGLONG)1024 * 1024)
+        if (bValidName && ulFreeBytes.QuadPart < (ULONGLONG)1024 * 1024)
         {
             CMsgOkDlg   dlg(IDS_ERROR_DISKSPACE_SAVE, m_pUIMgr);
 

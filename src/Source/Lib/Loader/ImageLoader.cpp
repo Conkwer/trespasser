@@ -432,13 +432,13 @@ bool CLoadImageDirectory::bProcessLocalSwapFile
 
     i4Error = 0;
 
-	GetRegString("Installed Directory", str_local_swap_dir, MAX_PATH, "");
+	GetRegString("Installed Directory", str_local_swap_dir, MAX_PATH, ".\\");
 
-	// Check the last character of the install path.
-	char ch_last = *(str_local_swap_dir+strlen(str_local_swap_dir)-1);
-	if ((ch_last == '\\') || (ch_last == '/'))
+	// Check the last character of the install path (guard against an empty value).
+	int i_len = strlen(str_local_swap_dir);
+	if (i_len > 0 && (str_local_swap_dir[i_len-1] == '\\' || str_local_swap_dir[i_len-1] == '/'))
 	{
-		*(str_local_swap_dir+strlen(str_local_swap_dir)-1) = 0;
+		str_local_swap_dir[i_len-1] = 0;
 	}
 
 	// Make the name of the compressed file
@@ -690,9 +690,10 @@ bool CLoadImageDirectory::bProcessLocalSwapFile
         _splitpath(strLocalImage, szDrive, NULL, NULL, NULL);
         strcat(szDrive, "\\");
 
-        GetDiskFreeSpaceEx(szDrive, &ulFreeBytes, &ulTotalBytes, &ulTotalFreeBytes);
-        // Check for enough free space for a save (64-bit — works on large drives)
-        if (ulFreeBytes.QuadPart < (ULONGLONG)u4LocalImageSize)
+        // 64-bit free-space check (works on large drives). Only reject if the API
+        // succeeds AND space is genuinely short — a failed query must not block loading.
+        if (GetDiskFreeSpaceEx(szDrive, &ulFreeBytes, &ulTotalBytes, &ulTotalFreeBytes) &&
+            ulFreeBytes.QuadPart < (ULONGLONG)u4LocalImageSize)
         {
             i4Error = -2;
 			SetEvent(hCopyLocal);
