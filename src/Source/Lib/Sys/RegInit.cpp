@@ -179,10 +179,13 @@ int g_iRenderer = 0; // 0=software, 1=DX6 (legacy D3D path), 2=DX9 (new backend)
 BOOL bGetD3D()
 {
 	// Trespasser-Plus: Renderer=dx6 behaves like the legacy "Use D3D"=1 key.
-	// Renderer=dx9 (g_iRenderer==2) uses the new D3D9 backend — falls back to
-	// software until that driver is wired up (the D3D9 init checks g_iRenderer).
 	if (g_iRenderer == 1)
 		return TRUE;
+	// Renderer=dx9 MUST NOT enable the legacy D3D6 path (the legacy "Use D3D" key
+	// is often 1 from earlier testing) — the D3D9 driver is initialized separately
+	// in CRenderShell::bCreateScreen when g_iRenderer==2.
+	if (g_iRenderer == 2)
+		return FALSE;
 	return GetRegValue(strFLAG_D3D, DEFAULT_D3D) != 0;
 }
 
