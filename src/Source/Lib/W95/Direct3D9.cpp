@@ -275,7 +275,7 @@ void D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch)
 			s_pTex2D->Release();
 			s_pTex2D = NULL;
 		}
-		s_pD3D9->CreateTexture(D3D9_TEX_W, D3D9_TEX_H, 1, 0,
+		s_pDevice->CreateTexture(D3D9_TEX_W, D3D9_TEX_H, 1, 0,
 			D3DFMT_X8R8G8B8, D3DPOOL_MANAGED, &s_pTex2D, NULL);
 		s_iTex2DWidth  = iWidth;
 		s_iTex2DHeight = iHeight;

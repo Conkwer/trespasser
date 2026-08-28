@@ -326,8 +326,8 @@ private:
 		sd.ddpfPixelFormat.dwGBitMask = 0x07E0;
 		sd.ddpfPixelFormat.dwBBitMask = 0x001F;
 
-		DirectDraw::err = DirectDraw::pdd->CreateSurface(&sd, &pddsDraw, 0);
-		if (FAILED(DirectDraw::err) || !pddsDraw)
+		HRESULT hres = DirectDraw::pdd->CreateSurface(&sd, &pddsDraw, 0);
+		if (FAILED(hres) || !pddsDraw)
 			return false;
 
 		// D3D9 owns the display — there is no DDraw primary surface in this mode.
