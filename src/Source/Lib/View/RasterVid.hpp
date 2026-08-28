@@ -592,6 +592,7 @@ public:
     {
         // D3D9 mode has no DDraw surfaces at all (the raster is a DIB) — callers
         // must use the dx9 branches (hdcGet/raster Lock) instead.
+        extern int g_iRenderer;
         if (g_iRenderer == 2)
             return NULL;
         return pddsPrimary ? pddsPrimary : pddsDraw;
