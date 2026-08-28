@@ -172,9 +172,17 @@ void SetD3D(BOOL b_d3d)
 	SetRegValue(strFLAG_D3D, b_d3d);
 }
 
+// Trespasser-Plus: renderer selection parsed from [TrespasserPlus] Renderer=.
+int g_iRenderer = 0; // 0=software, 1=DX6 (legacy D3D path), 2=DX9 (new backend)
+
 //*********************************************************************************************
 BOOL bGetD3D()
 {
+	// Trespasser-Plus: Renderer=dx6 behaves like the legacy "Use D3D"=1 key.
+	// Renderer=dx9 (g_iRenderer==2) uses the new D3D9 backend — falls back to
+	// software until that driver is wired up (the D3D9 init checks g_iRenderer).
+	if (g_iRenderer == 1)
+		return TRUE;
 	return GetRegValue(strFLAG_D3D, DEFAULT_D3D) != 0;
 }
 

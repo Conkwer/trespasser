@@ -113,6 +113,8 @@
 #define REG_KEY_TUTORIALS           "ShowTutorials"
 #define REG_KEY_DEBUG               "Debug"
 #define REG_KEY_LANGUAGE            "Language"
+#define REG_KEY_FILTER              "Filter"
+#define REG_KEY_RENDERER            "Renderer"
 
 // Registry entries for error handling.
 #define REG_KEY_AUTOSAVE            "Auto Save"
@@ -139,6 +141,8 @@
 #define DEFAULT_TUTORIALS           1
 #define DEFAULT_DEBUG               0
 #define DEFAULT_LANGUAGE            ""
+#define DEFAULT_FILTER              1
+#define DEFAULT_RENDERER            ""
 #define DEFAULT_RANDOMIZATION       1
 #define DEFAULT_VIEWPORT_X          0
 #define DEFAULT_VIEWPORT_Y          0
@@ -234,6 +238,10 @@ BOOL bGetD3D
 // Gets the D3D flag from the registry.
 //
 //**************************************
+
+// Trespasser-Plus renderer selection (0=software, 1=DX6, 2=DX9). Set from
+// [TrespasserPlus] Renderer= in OpenKey(); consumed by bGetD3D() and the D3D9 driver.
+extern int g_iRenderer;
 
 //*********************************************************************************************
 //

@@ -65,6 +65,10 @@
 #include "Lib/View/Raster.hpp"
 #include "Lib/Renderer/ScreenRender.hpp"
 
+// Trespasser-Plus: Filter=0 forces nearest-neighbor (POINT) filtering in the D3D
+// paths regardless of the per-polygon flag. Set from [TrespasserPlus] Filter=.
+extern bool g_bFilterTextures;
+
 
 //
 // Macro definitions.
@@ -266,6 +270,9 @@ public:
 	//
 	//**************************************
 	{
+		// Trespasser-Plus: Filter=0 forces nearest-neighbor regardless of the per-polygon flag.
+		b_state = b_state && g_bFilterTextures;
+
 		// Do nothing if the state is correct.
 		if (astsStates[i_stage].bFiltering == b_state)
 			return;

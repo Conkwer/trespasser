@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <windows.h>
 #include "Reg.h"
 #include "RegInit.hpp"
@@ -95,6 +96,8 @@ static void WriteDefaults()
 	SetModValue(REG_KEY_TUTORIALS,           DEFAULT_TUTORIALS);
 	SetModValue(REG_KEY_DEBUG,               DEFAULT_DEBUG);
 	SetModString(REG_KEY_LANGUAGE,           DEFAULT_LANGUAGE);
+	SetModValue(REG_KEY_FILTER,              DEFAULT_FILTER);
+	SetModString(REG_KEY_RENDERER,           DEFAULT_RENDERER);
 
 	// Gameplay
 	SetRegValue(REG_KEY_GORE,                 3);
@@ -159,6 +162,20 @@ void OpenKey()
 
 	// Enable or disable the debug log file based on the config.
 	bDebugLogFile = GetModValue(REG_KEY_DEBUG, DEFAULT_DEBUG) != 0;
+
+	// Trespasser-Plus renderer selection: Renderer=software|dx6|dx9 (default software).
+	// dx6 = legacy D3D6 path (same as "Use D3D"=1); dx9 = new D3D9 backend (WIP).
+	{
+		char szRenderer[16];
+		GetModString(REG_KEY_RENDERER, szRenderer, sizeof(szRenderer), DEFAULT_RENDERER);
+		g_iRenderer = (stricmp(szRenderer, "dx6") == 0) ? 1
+		            : (stricmp(szRenderer, "dx9") == 0) ? 2 : 0;
+	}
+
+	// Texture filtering: Filter=0 forces nearest-neighbor in the D3D paths (min/mag -> POINT),
+	// matching the sharp ATX/CE look instead of the bilinear blur. Default 1 (bilinear).
+	extern bool g_bFilterTextures;
+	g_bFilterTextures = GetModValue(REG_KEY_FILTER, DEFAULT_FILTER) != 0;
 }
 
 void CloseKey(BOOL b_change_safemode)

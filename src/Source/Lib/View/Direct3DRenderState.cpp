@@ -59,6 +59,10 @@
 #include "Common.hpp"
 #include "Direct3DRenderState.hpp"
 
+// Trespasser-Plus: default bilinear filtering; Filter=0 in [TrespasserPlus] sets
+// this to false at startup (reg.cpp OpenKey) for the sharp nearest-neighbor look.
+bool g_bFilterTextures = true;
+
 
 //*********************************************************************************************
 //
