@@ -203,6 +203,11 @@ void CTPassGlobals::CaptureBackground(bool bBackbuffer /* = false */)
     }
 
     hr = pSurface->GetDC(&hdcSrc);
+    if (FAILED(hr))
+    {
+        dprintf("D3D9: CaptureBackground GetDC failed hr=0x%08x\n", (unsigned)hr);
+        return;
+    }
 
     hdcDst = m_prasBkgnd->hdcGet();
 

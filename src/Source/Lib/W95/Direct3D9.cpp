@@ -314,12 +314,30 @@ void D3D9SetHardwareFrame(BOOL bHardwareFrame)
 	s_bHardwareFrame = bHardwareFrame;
 }
 
+// Throttled diagnostic: log a message at most every ~5 seconds (the present runs
+// every frame — a failing present would otherwise spam the log).
+static void D3D9Diag(const char* psz)
+{
+	static DWORD s_dwLastLog = 0;
+	DWORD dwNow = GetTickCount();
+	if (dwNow - s_dwLastLog < 5000)
+		return;
+	s_dwLastLog = dwNow;
+	D3D9Log(psz);
+}
+
 void D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch)
 {
 	if (!s_pDevice || !pSrc)
+	{
+		D3D9Diag("Present2D: no device/src");
 		return;
+	}
 	if (!D3D9CheckDeviceReset())
+	{
+		D3D9Diag("Present2D: device check failed");
 		return;
+	}
 
 	// Lazy-create the upload texture (pow2, managed so it survives device reset).
 	if (!s_pTex2D || s_iTex2DWidth != iWidth || s_iTex2DHeight != iHeight)
@@ -335,12 +353,49 @@ void D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch)
 		s_iTex2DHeight = iHeight;
 	}
 	if (!s_pTex2D)
+	{
+		D3D9Diag("Present2D: no texture (CreateTexture failed)");
 		return;
+	}
+
+	// One-time + throttled diagnostic: the average brightness of the content we
+	// upload (separates a broken present from black content).
+	{
+		static DWORD s_dwLastBright = 0;
+		DWORD dwNow = GetTickCount();
+		if (dwNow - s_dwLastBright > 5000)
+		{
+			s_dwLastBright = dwNow;
+			const char* ps = (const char*)pSrc;
+			int iH = iHeight > 32 ? 32 : iHeight;
+			int iW = iWidth > 32 ? 32 : iWidth;
+			DWORD dwSum = 0;
+			for (int yy = 0; yy < iH; yy++)
+			{
+				const WORD* pRow = (const WORD*)(ps + yy * iSrcPitch);
+				for (int xx = 0; xx < iW; xx++)
+				{
+					WORD px = pRow[xx];
+					int  r  = (px >> 11) & 0x1F;
+					int  g  = (px >> 5)  & 0x3F;
+					int  b  = px & 0x1F;
+					dwSum += (r * 299 + g * 587 + b * 114) / 1000;
+				}
+			}
+			char szBr[80];
+			wsprintf(szBr, "Present2D: content brightness avg=%lu (0-31)",
+				dwSum / (DWORD)(iH * iW));
+			D3D9Log(szBr);
+		}
+	}
 
 	// Upload: convert 565 -> X8R8G8B8 into the locked texture.
 	D3DLOCKED_RECT lr;
 	if (FAILED(s_pTex2D->LockRect(0, &lr, NULL, 0)))
+	{
+		D3D9Diag("Present2D: LockRect failed");
 		return;
+	}
 	Convert565To8888(pSrc, lr.pBits, iWidth, iHeight, iSrcPitch, (int)lr.Pitch);
 	s_pTex2D->UnlockRect(0);
 
