@@ -18,6 +18,7 @@
 #include <DirectX/d3d9.h>
 #include <windows.h>
 #include <stdio.h>
+#include "DebugConsole.hpp"
 
 #include "Direct3D9API.h"
 
@@ -40,15 +41,12 @@ static BOOL                s_bHardwareFrame = FALSE;
 
 static void D3D9SetViewportFull(void);
 
-// Log to the game's DebugLog.txt (the game pins the CWD to its own folder on startup).
+// Log through the game's dprintf (dout -> DebugLog.txt in the game folder, flushed).
+// NOTE: fopen-append to DebugLog.txt races with the game's buffered dout stream and
+// writes to the process CWD (not the game folder) — never use it for diagnostics here.
 static void D3D9Log(const char* psz)
 {
-	FILE* f = fopen("DebugLog.txt", "a");
-	if (f)
-	{
-		fprintf(f, "D3D9: %s\n", psz);
-		fclose(f);
-	}
+	dprintf("D3D9: %s\n", (char*)psz);
 }
 
 BOOL D3D9Init(HWND hwnd, int iWidth, int iHeight, BOOL bFullScreen)

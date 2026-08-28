@@ -210,13 +210,8 @@ int iGetScreenBitdepth();
 		// size). The screen raster created below is a sysmem-only surface; D3D9 owns
 		// the display and CRasterWin::Flip uploads it via D3D9Present2D.
 		{
-			FILE* f = fopen("DebugLog.txt", "a");
-			if (f)
-			{
-				fprintf(f, "D3D9: bCreateScreen hook, g_iRenderer=%d, %dx%dx%d\n",
-					g_iRenderer, i_screen_width, i_screen_height, i_screen_bits);
-				fclose(f);
-			}
+			dprintf("D3D9: bCreateScreen hook, g_iRenderer=%d, %dx%dx%d\n",
+				g_iRenderer, i_screen_width, i_screen_height, i_screen_bits);
 			if (g_iRenderer == 2)
 				D3D9Init(hwndMain, i_screen_width, i_screen_height, FALSE);
 		}
@@ -250,15 +245,10 @@ int iGetScreenBitdepth();
 		}
 		if (g_iRenderer == 2)
 		{
-			FILE* f2 = fopen("DebugLog.txt", "a");
-			if (f2)
-			{
-				fprintf(f2, "D3D9: bCreateScreen %dx%d reuse=%d cur=%dx%d\n",
-					i_screen_width, i_screen_height, bReuseD3D9Raster,
-					prasMainScreen ? prasMainScreen->iWidthFront  : 0,
-					prasMainScreen ? prasMainScreen->iHeightFront : 0);
-				fclose(f2);
-			}
+			dprintf("D3D9: bCreateScreen %dx%d reuse=%d cur=%dx%d\n",
+				i_screen_width, i_screen_height, bReuseD3D9Raster,
+				prasMainScreen ? prasMainScreen->iWidthFront  : 0,
+				prasMainScreen ? prasMainScreen->iHeightFront : 0);
 		}
 
 		// if we have a sky remove its reference to the main screen
