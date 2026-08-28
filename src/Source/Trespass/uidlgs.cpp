@@ -518,12 +518,22 @@ void CLoaderWnd::InnerWindowLoop(bool bPaint)
         ddfx.dwDDFX = DDBLTFX_NOTEARING;
 
         // Now draw everthing from the back buffer to the front buffer
-        pSurface = prasMainScreen->GetPrimarySurface();
-        hr = pSurface->Blt(&m_pUIMgr->m_rcInvalid,
-                           prasMainScreen->pddsDraw,
-                           &m_pUIMgr->m_rcInvalid,
-                           DDBLT_WAIT | DDBLT_ROP,
-                           &ddfx);
+        if (g_iRenderer == 2)
+        {
+            // D3D9 mode: there is no DDraw primary surface — present the
+            // raster through the D3D9 driver instead (the Blt below would be a
+            // no-op self-Blt on the sysmem raster, hiding the load progress).
+            prasMainScreen->Flip();
+        }
+        else
+        {
+            pSurface = prasMainScreen->GetPrimarySurface();
+            hr = pSurface->Blt(&m_pUIMgr->m_rcInvalid,
+                               prasMainScreen->pddsDraw,
+                               &m_pUIMgr->m_rcInvalid,
+                               DDBLT_WAIT | DDBLT_ROP,
+                               &ddfx);
+        }
 
         // Reset the invalid rect
         SetRect(&m_pUIMgr->m_rcInvalid, 0, 0, 0, 0);

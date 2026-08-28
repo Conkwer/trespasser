@@ -191,6 +191,11 @@ void CVideoWnd::NextSmackerFrame()
         NextNonDirect();
     }
 
+    // D3D9 mode: the video frames are written into the sysmem raster (no DDraw
+    // primary to blit to) — present each frame through the D3D9 driver.
+    if (g_iRenderer == 2)
+        prasMainScreen->Flip();
+
     if (m_pSmack->FrameNum == m_pSmack->Frames - 1)
     {
         m_fVideoOver = true;
