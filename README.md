@@ -88,7 +88,7 @@ The workspace contains 23 sub-projects (~300K lines of C++ across 1241 files).
 
 ## Disclaimer
 
-**Trespasser-Plus is an independent, fan-made preservation project. It is NOT affiliated with, endorsed by, or sponsored by DreamWorks Interactive LLC, Electronic Arts, or any other rights holder.** All trademarks, character names, and game titles are property of their respective owners.
+**Trespasser-Plus is a preservation fork. It is NOT affiliated with, endorsed by, or sponsored by DreamWorks Interactive LLC, Electronic Arts, or any other rights holder.** All trademarks, character names, and game titles are property of their respective owners.
 
 This project distributes **no game assets**. To run the compiled binary you **must own the original retail CD** (v1.0, 1998) and install the game data yourself — the game is not playable without it.
 
