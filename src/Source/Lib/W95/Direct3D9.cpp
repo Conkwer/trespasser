@@ -18,9 +18,10 @@
 #include <DirectX/d3d9.h>
 #include <windows.h>
 #include <stdio.h>
-#include "Lib/Sys/DebugConsole.hpp"
 
 #include "Direct3D9API.h"
+
+extern void __cdecl dprintf(char* str, ...);
 
 static HMODULE             s_hD3D9   = NULL;
 static IDirect3D9*         s_pD3D9   = NULL;
