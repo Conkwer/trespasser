@@ -783,8 +783,9 @@ void CRenderWnd::OnSelectNewDriver()
 	// owns the display (bug 2). Refuse instead.
 	if (g_iRenderer == 2)
 	{
-		MsgDlg(NULL, MB_OK, "Trespasser-Plus",
-			"The renderer is fixed in DirectX9 mode.");
+		MessageBox(NULL,
+			"The renderer is fixed in DirectX9 mode (Trespasser-Plus).",
+			"Trespasser-Plus", MB_OK | MB_ICONINFORMATION);
 		return;
 	}
 
