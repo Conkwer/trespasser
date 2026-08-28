@@ -211,6 +211,8 @@ int iGetScreenBitdepth();
 		// the display and CRasterWin::Flip uploads it via D3D9Present2D.
 		if (g_iRenderer == 2)
 		{
+			extern void __cdecl dprintf(char*, ...);
+			dprintf("D3D9: bCreateScreen hook, hwnd=%x, size=%dx%d\n", hwndMain, i_screen_width, i_screen_height);
 			D3D9Init(hwndMain, i_screen_width, i_screen_height, FALSE);
 		}
 

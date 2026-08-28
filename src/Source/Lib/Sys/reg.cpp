@@ -170,6 +170,7 @@ void OpenKey()
 		GetModString(REG_KEY_RENDERER, szRenderer, sizeof(szRenderer), DEFAULT_RENDERER);
 		g_iRenderer = (stricmp(szRenderer, "dx6") == 0) ? 1
 		            : (stricmp(szRenderer, "dx9") == 0) ? 2 : 0;
+		dprintf("Trespasser-Plus: Renderer='%s' -> g_iRenderer=%d\n", szRenderer, g_iRenderer);
 	}
 
 	// Texture filtering: Filter=0 forces nearest-neighbor in the D3D paths (min/mag -> POINT),
