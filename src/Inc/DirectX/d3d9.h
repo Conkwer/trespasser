@@ -20,12 +20,17 @@
 
 #ifndef _D3D9_H_
 #define _D3D9_H_
-/* VS6 compat shims: mingw-w64 defines __MSABI_LONG and WINBOOL; VS6 has neither. */
+/* VS6 compat shims: mingw-w64 defines __MSABI_LONG and WINBOOL; VS6 has neither,
+   and VS6's Win95-era windef.h predates HMONITOR. */
 #ifndef __MSABI_LONG
 #define __MSABI_LONG(x) (x)
 #endif
 #ifndef WINBOOL
 #define WINBOOL BOOL
+#endif
+#ifndef _HMONITOR_DEFINED
+#define _HMONITOR_DEFINED
+typedef HANDLE HMONITOR;
 #endif
 
 
