@@ -33,6 +33,14 @@ void  D3D9EndScene(void);
 void  D3D9Clear(DWORD dwColor);
 BOOL  D3D9Present(void);
 
+// 2D/overlay present: uploads a 16bpp RGB565 raster as a fullscreen textured quad and
+// presents. When the 3D renderer called D3D9SetHardwareFrame(TRUE) this frame, the upload
+// is an ADDITIVE overlay (captions/HUD on top of the 3D image); otherwise it is an opaque
+// full-frame present (menus, loading, movies, pause). The hardware-frame flag is consumed
+// (reset) by this call.
+void  D3D9SetHardwareFrame(BOOL bHardwareFrame);
+void  D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch);
+
 // Device-lost handling for real d3d9 (alt-tab/UAC). D3D9CheckDevice returns TRUE when
 // the device is usable; FALSE when lost. D3D9Reset recreates the device (call when
 // TestCooperativeLevel reports D3DERR_DEVICENOTRESET).

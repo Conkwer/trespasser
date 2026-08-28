@@ -590,7 +590,9 @@ public:
 	//
     IDirectDrawSurface * GetPrimarySurface()
     {
-        return pddsPrimary;
+        // D3D9 mode has no primary surface — return the sysmem draw surface instead
+        // (SMK video and other GetPrimarySurface users draw into the raster's surface).
+        return pddsPrimary ? pddsPrimary : pddsDraw;
     }
 	//
 	// Returns a pointer to the primary surface.  This is necessary for Videos.

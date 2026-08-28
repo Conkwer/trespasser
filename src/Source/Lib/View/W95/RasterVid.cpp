@@ -72,6 +72,7 @@
 #include "Lib/Sys/W95/Render.hpp"
 #include "Lib/Sys/RegInit.hpp"
 #include "Lib/W95/Direct3D.hpp"
+#include "Lib/W95/Direct3D9API.h"
 #include "Lib/Std/PrivSelf.hpp"
 #include "Lib/Renderer/ScreenRenderAuxD3D.hpp"
 #include "Lib/W95/Direct3DCards.hpp"
@@ -298,6 +299,45 @@ private:
 
 	//******************************************************************************************
 	//
+	bool bConstructD3D9SysRam
+	(
+		int i_width,	// The desired dimensions of the raster.
+		int i_height,
+		int i_bits		// Bit depth (16).
+	)
+	//
+	// Creates a system-memory offscreen screen raster for D3D9 mode. D3D9 owns the
+	// display; this surface is only the CPU-side raster (GDI text, captions, movies)
+	// that CRasterWin::Flip uploads via the D3D9 driver.
+	//
+	//**************************************
+	{
+		CDDSize<DDSURFACEDESC> sd;
+
+		// System-memory offscreen surface, 16bpp 565 (matching the game's pxf).
+		sd.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT;
+		sd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN | DDSCAPS_SYSTEMMEMORY;
+		sd.dwWidth  = RoundUp(i_width, 8);
+		sd.dwHeight = i_height;
+		sd.ddpfPixelFormat.dwSize = sizeof(DDPIXELFORMAT);
+		sd.ddpfPixelFormat.dwFlags = DDPF_RGB;
+		sd.ddpfPixelFormat.dwRGBBitCount = 16;
+		sd.ddpfPixelFormat.dwRBitMask = 0xF800;
+		sd.ddpfPixelFormat.dwGBitMask = 0x07E0;
+		sd.ddpfPixelFormat.dwBBitMask = 0x001F;
+
+		DirectDraw::err = DirectDraw::pdd->CreateSurface(&sd, &pddsDraw, 0);
+		if (FAILED(DirectDraw::err) || !pddsDraw)
+			return false;
+
+		// D3D9 owns the display — there is no DDraw primary surface in this mode.
+		pddsPrimary = 0;
+		bVideoMem = false;
+		return true;
+	}
+
+	//******************************************************************************************
+	//
 	void ConstructSoftware
 	(
 		HWND hwnd,					// A previously constructed Windows HWND.
@@ -319,6 +359,17 @@ private:
 		bFullScreen = i_bits != 0;
 		iWidthFront  = i_width;
 		iHeightFront = i_height;
+
+		// D3D9 mode: system-memory raster only; D3D9 owns the display. No DDraw
+		// cooperative level / display mode changes (windowed present via the driver).
+		if (g_iRenderer == 2)
+		{
+			bFullScreen = false;
+			bFlippable  = false;
+			if (bConstructD3D9SysRam(i_width, i_height, i_bits))
+				return;
+			// Fall through to the software path on failure.
+		}
 
 		if (i_bits) 
 		{		
@@ -1431,6 +1482,29 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 	//******************************************************************************************
 	void CRasterWin::Flip() 
 	{
+		// D3D9 mode: upload the CPU-side raster to the D3D9 backbuffer and present.
+		// Opaque for 2D frames (menu/movies/pause); additive overlay for 3D frames
+		// (the hardware-frame flag was set by the D3D9 renderer after its own Present).
+		if (g_iRenderer == 2)
+		{
+			// Force an unlock.
+			Unlock();
+
+			if (pddsDraw)
+			{
+				DDSURFACEDESC dds;
+				ZeroMemory(&dds, sizeof(dds));
+				dds.dwSize = sizeof(dds);
+				if (SUCCEEDED(pddsDraw->Lock(NULL, &dds, DDLOCK_WAIT, NULL)))
+				{
+					if (dds.lpSurface)
+						D3D9Present2D(dds.lpSurface, iWidthFront, iHeightFront, (int)dds.lPitch);
+					pddsDraw->Unlock(NULL);
+				}
+			}
+			return;
+		}
+
 		// If single surface, return.
 		if (pddsPrimary == pddsDraw)
 			return;

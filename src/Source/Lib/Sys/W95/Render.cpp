@@ -78,6 +78,8 @@
 #include "Lib/Renderer/ScreenRender.hpp"
 #include "Lib/EntityDBase/Query/QRenderer.hpp"
 #include "Lib/W95/dd.hpp"
+#include "Lib/W95/Direct3D9API.h"
+#include "Lib/Sys/RegInit.hpp"
 #include "Lib/View/Raster.hpp"
 #include "Lib/Std/StringEx.hpp"
 #include "Lib/View/Viewport.hpp"
@@ -203,6 +205,14 @@ int iGetScreenBitdepth();
 	
 		iLastScreenBits = i_screen_bits;
 		bLastSystemMem  = b_system_mem;
+
+		// D3D9 mode: initialize the D3D9 driver once (windowed, matching the screen
+		// size). The screen raster created below is a sysmem-only surface; D3D9 owns
+		// the display and CRasterWin::Flip uploads it via D3D9Present2D.
+		if (g_iRenderer == 2)
+		{
+			D3D9Init(hwndMain, i_screen_width, i_screen_height, FALSE);
+		}
 
 		// Delete the current renderer.  We must do this before calling bChangeRenderer below,
 		// because by then, the rasters will be invalid.

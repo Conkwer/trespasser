@@ -128,7 +128,10 @@ int32 CInitDD::Initialize()
 
 	if (!b_use_reg || !b_fullscreen)
 	{
-		DirectDraw::err = DirectDraw::pdd4->SetCooperativeLevel(0, DDSCL_NORMAL);
+		// D3D9 mode has no pdd4 (no D3D3 device) — the sysmem screen raster needs
+		// no cooperative level; D3D9 owns the display.
+		if (DirectDraw::pdd4)
+			DirectDraw::err = DirectDraw::pdd4->SetCooperativeLevel(0, DDSCL_NORMAL);
 	}
 
     return iRet;
