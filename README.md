@@ -88,4 +88,10 @@ The workspace contains 23 sub-projects (~300K lines of C++ across 1241 files).
 
 ## Disclaimer
 
-The source code surfaced within the community after many years of preservation efforts. This repository exists for **educational and archival purposes only**. No game assets, copyrighted materials, or proprietary data are included. This is not a commercial project. If you hold rights to any content here and wish it removed, open an issue.
+**Trespasser-Plus is an independent, fan-made preservation project. It is NOT affiliated with, endorsed by, or sponsored by DreamWorks Interactive LLC, Electronic Arts, or any other rights holder.** All trademarks, character names, and game titles are property of their respective owners.
+
+This project distributes **no game assets**. To run the compiled binary you **must own the original retail CD** (v1.0, 1998) and install the game data yourself — the game is not playable without it.
+
+The project exists for **personal, non-commercial use and research purposes**: preserving the source code and fixing compatibility bugs so the game runs on modern hardware. It is not a commercial product and no money is made from it.
+
+If you hold rights to any content here and wish it removed, open an issue.
