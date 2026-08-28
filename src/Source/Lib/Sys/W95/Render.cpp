@@ -213,7 +213,8 @@ int iGetScreenBitdepth();
 			FILE* f = fopen("DebugLog.txt", "a");
 			if (f)
 			{
-				fprintf(f, "D3D9: bCreateScreen hook, g_iRenderer=%d\n", g_iRenderer);
+				fprintf(f, "D3D9: bCreateScreen hook, g_iRenderer=%d, %dx%dx%d\n",
+					g_iRenderer, i_screen_width, i_screen_height, i_screen_bits);
 				fclose(f);
 			}
 			if (g_iRenderer == 2)
@@ -246,6 +247,18 @@ int iGetScreenBitdepth();
 			if (prasMainScreen->iWidthFront  == i_screen_width &&
 				prasMainScreen->iHeightFront == i_screen_height)
 				bReuseD3D9Raster = true;
+		}
+		if (g_iRenderer == 2)
+		{
+			FILE* f2 = fopen("DebugLog.txt", "a");
+			if (f2)
+			{
+				fprintf(f2, "D3D9: bCreateScreen %dx%d reuse=%d cur=%dx%d\n",
+					i_screen_width, i_screen_height, bReuseD3D9Raster,
+					prasMainScreen ? prasMainScreen->iWidthFront  : 0,
+					prasMainScreen ? prasMainScreen->iHeightFront : 0);
+				fclose(f2);
+			}
 		}
 
 		// if we have a sky remove its reference to the main screen

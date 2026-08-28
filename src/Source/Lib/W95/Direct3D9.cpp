@@ -155,7 +155,12 @@ BOOL D3D9Init(HWND hwnd, int iWidth, int iHeight, BOOL bFullScreen)
 	}
 
 	s_bInited = TRUE;
-	D3D9Log("Init: D3D9 device created (HAL, sw VP, D16 depth)");
+	{
+		char szInit[96];
+		wsprintf(szInit, "Init: D3D9 device created (HAL, sw VP, D16, %ux%u)",
+			(unsigned)s_pp.BackBufferWidth, (unsigned)s_pp.BackBufferHeight);
+		D3D9Log(szInit);
+	}
 	return TRUE;
 }
 
@@ -353,6 +358,20 @@ void D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch)
 	const float fW = (float)d.Width;
 	const float fH = (float)d.Height;
 
+	// One-time diagnostic: what the backbuffer reports (windowed dgVoodoo2 may
+	// report the fullscreen size or a stale size).
+	{
+		static BOOL bLoggedBB = FALSE;
+		if (!bLoggedBB)
+		{
+			bLoggedBB = TRUE;
+			char szBB[96];
+			wsprintf(szBB, "Present2D backbuffer: %ux%u (raster %dx%d)",
+				(unsigned)d.Width, (unsigned)d.Height, iWidth, iHeight);
+			D3D9Log(szBB);
+		}
+	}
+
 	// Fullscreen textured quad (backbuffer coords).
 	const float fU1 = (float)iWidth  / D3D9_TEX_W;
 	const float fV1 = (float)iHeight / D3D9_TEX_H;
@@ -385,7 +404,15 @@ void D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch)
 	s_pDevice->SetFVF(D3DFVF_XYZRHW | D3DFVF_TEX1);
 	s_pDevice->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2, aVerts, sizeof(QuadVert));
 	s_pDevice->EndScene();
-	s_pDevice->Present(NULL, NULL, NULL, NULL);
+	{
+		HRESULT hrPresent = s_pDevice->Present(NULL, NULL, NULL, NULL);
+		if (FAILED(hrPresent))
+		{
+			char szP[96];
+			wsprintf(szP, "Present failed (hr=0x%08x)", (unsigned)hrPresent);
+			D3D9Log(szP);
+		}
+	}
 
 	// The hardware-frame flag is consumed by this present.
 	s_bHardwareFrame = FALSE;

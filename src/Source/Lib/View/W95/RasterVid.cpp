@@ -328,7 +328,12 @@ private:
 
 		HRESULT hres = DirectDraw::pdd->CreateSurface(&sd, &pddsDraw, 0);
 		if (FAILED(hres) || !pddsDraw)
+		{
+			PrintD3D("D3D9: bConstructD3D9SysRam FAILED (%dx%d) hr=0x%08x\n",
+				i_width, i_height, (unsigned)hres);
 			return false;
+		}
+		PrintD3D("D3D9: bConstructD3D9SysRam OK (%dx%d)\n", i_width, i_height);
 
 		// D3D9 owns the display — there is no DDraw primary surface in this mode.
 		pddsPrimary = 0;
@@ -1489,6 +1494,15 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 		{
 			// Force an unlock.
 			Unlock();
+
+			// One-time diagnostic: the raster's surface dims vs logical dims.
+			static BOOL bLoggedFlip = FALSE;
+			if (!bLoggedFlip)
+			{
+				bLoggedFlip = TRUE;
+				PrintD3D("D3D9: Flip first: front=%dx%d logical=%dx%d\n",
+					iWidthFront, iHeightFront, iWidth, iHeight);
+			}
 
 			if (pddsDraw)
 			{

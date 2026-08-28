@@ -448,7 +448,23 @@ CRenderWnd::CRenderWnd(CUIManager * puimgr) : CUIDlg(puimgr)
 	Video::SetToValidMode(m_iWidth, m_iHeight);
 	SetDimensions(m_iWidth, m_iHeight);
 
-    bFindResolutions(m_guidAdapter, arResolutions, iNumResolutions);
+	if (g_iRenderer == 2)
+	{
+		// D3D9 mode: never poke DirectDrawCreate through the (possibly dgVoodoo2-
+		// wrapped) DDraw DLL while the D3D9 device is presenting — the wrapper
+		// re-negotiates its presentation state (the video-page squish + FPS drop).
+		// Reuse the startup enumeration instead.
+		iNumResolutions = 0;
+		for (int i = 0; i < Video::iModes && iNumResolutions < 20; i++)
+		{
+			arResolutions[iNumResolutions].iWidth     = Video::ascrmdList[i].iW;
+			arResolutions[iNumResolutions].iHeight    = Video::ascrmdList[i].iH;
+			arResolutions[iNumResolutions].iRefreshHz = 0;
+			iNumResolutions++;
+		}
+	}
+	else
+		bFindResolutions(m_guidAdapter, arResolutions, iNumResolutions);
 }
 
 CRenderWnd::~CRenderWnd()
