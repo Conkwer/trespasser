@@ -209,15 +209,15 @@ int iGetScreenBitdepth();
 		// D3D9 mode: initialize the D3D9 driver once (windowed, matching the screen
 		// size). The screen raster created below is a sysmem-only surface; D3D9 owns
 		// the display and CRasterWin::Flip uploads it via D3D9Present2D.
-		if (g_iRenderer == 2)
 		{
 			FILE* f = fopen("DebugLog.txt", "a");
 			if (f)
 			{
-				fprintf(f, "D3D9: bCreateScreen hook g_iRenderer=%d\n", g_iRenderer);
+				fprintf(f, "D3D9: bCreateScreen hook, g_iRenderer=%d\n", g_iRenderer);
 				fclose(f);
 			}
-			D3D9Init(hwndMain, i_screen_width, i_screen_height, FALSE);
+			if (g_iRenderer == 2)
+				D3D9Init(hwndMain, i_screen_width, i_screen_height, FALSE);
 		}
 
 		// Delete the current renderer.  We must do this before calling bChangeRenderer below,
