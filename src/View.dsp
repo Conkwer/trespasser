@@ -164,6 +164,10 @@ SOURCE=.\Source\Lib\W95\Direct3D.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\Source\Lib\W95\Direct3D9.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\Source\Lib\W95\Direct3DCards.cpp
 # End Source File
 # Begin Source File
@@ -273,6 +277,10 @@ SOURCE=.\source\Lib\W95\DDFont.hpp
 # Begin Source File
 
 SOURCE=.\Source\Lib\W95\Direct3D.hpp
+# End Source File
+# Begin Source File
+
+SOURCE=.\Source\Lib\W95\Direct3D9API.h
 # End Source File
 # Begin Source File
 
