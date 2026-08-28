@@ -490,6 +490,17 @@ int DoWinMain(HINSTANCE hInstance,
 						while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t')
 							*pDst++ = *pszCmd++;
 						*pDst = '\0';
+
+						// Strip surrounding quotes: cmd.exe batch files pass the path as
+						// "path" and the quote characters would otherwise become part of
+						// the filename (invalid on Windows -> config never found).
+						if (g_szConfigPath[0] == '"')
+						{
+							char* pEnd = g_szConfigPath + strlen(g_szConfigPath);
+							if (pEnd > g_szConfigPath + 1 && pEnd[-1] == '"')
+								pEnd[-1] = '\0';
+							memmove(g_szConfigPath, g_szConfigPath + 1, strlen(g_szConfigPath + 1) + 1);
+						}
 					}
 					break;
 				}

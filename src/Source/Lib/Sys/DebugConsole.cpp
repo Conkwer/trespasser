@@ -195,6 +195,7 @@ void dprint(const char* str)
 {
 #if VER_DEBUG_TEXT
 	dout << str;
+	dout.flush();  // Trespasser-Plus: unbuffered log
 #endif
 }
 
@@ -211,6 +212,7 @@ void __cdecl dprintf(char* str,...)
 	va_end (argptr);
 
 	dout << buf;
+	dout.flush();  // Trespasser-Plus: unbuffered log (crash/kill must not lose diagnostics)
 
 #endif
 }

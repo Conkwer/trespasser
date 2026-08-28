@@ -117,7 +117,9 @@ BOOL D3D9Init(HWND hwnd, int iWidth, int iHeight, BOOL bFullScreen)
 
 	if (FAILED(hr))
 	{
-		D3D9Log("Init: CreateDevice failed");
+		char sz[96];
+		wsprintf(sz, "Init: CreateDevice failed (hr=0x%08x)", hr);
+		D3D9Log(sz);
 		s_pD3D9->Release();
 		s_pD3D9 = NULL;
 		FreeLibrary(s_hD3D9);
