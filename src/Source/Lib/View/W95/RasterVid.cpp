@@ -73,6 +73,20 @@
 #include "Lib/Sys/RegInit.hpp"
 #include "Lib/W95/Direct3D.hpp"
 #include "Lib/W95/Direct3D9API.h"
+
+//******************************************************************************************
+//
+// D3D9-mode screen raster: a GDI DIB section instead of a DirectDraw surface.
+// Win11's system ddraw.dll rejects an explicit 565 pixel format on sysmem
+// offscreens with DDERR_INVALIDPIXELFORMAT (0x887600d4) — dgVoodoo2 accepted it,
+// but dx9 mode must run without any DDraw wrapper. The DIB keeps 565 exactly.
+// (Singletons: dx9 mode has exactly one screen raster, prasMainScreen.)
+//
+//******************************************************************************************
+static HDC      s_hdcDib    = NULL;
+static HBITMAP  s_hbmDib    = NULL;
+static void*    s_pBitsDib  = NULL;
+static int      s_iDibPitch = 0;
 #include "Lib/Std/PrivSelf.hpp"
 #include "Lib/Renderer/ScreenRenderAuxD3D.hpp"
 #include "Lib/W95/Direct3DCards.hpp"
@@ -297,21 +311,6 @@ private:
 		return true;
 	}
 
-//******************************************************************************************
-//
-// D3D9-mode screen raster: a GDI DIB section instead of a DirectDraw surface.
-// Win11's system ddraw.dll rejects an explicit 565 pixel format on sysmem
-// offscreens with DDERR_INVALIDPIXELFORMAT (0x887600d4) — dgVoodoo2 accepted it,
-// but dx9 mode must run without any DDraw wrapper. The DIB keeps 565 exactly.
-// (Singletons: dx9 mode has exactly one screen raster, prasMainScreen.)
-//******************************************************************************************
-static HDC      s_hdcDib    = NULL;
-static HBITMAP  s_hbmDib    = NULL;
-static void*    s_pBitsDib  = NULL;
-static int      s_iDibPitch = 0;
-
-//******************************************************************************************
-//
 	bool bConstructD3D9SysRam
 	(
 		int i_width,	// The desired dimensions of the raster.
