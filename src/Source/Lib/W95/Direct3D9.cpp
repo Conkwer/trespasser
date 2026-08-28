@@ -38,6 +38,8 @@ static BOOL                s_bHardwareFrame = FALSE;
 #define D3D9_TEX_W   1024
 #define D3D9_TEX_H   512
 
+static void D3D9SetViewportFull(void);
+
 // Log to the game's DebugLog.txt (the game pins the CWD to its own folder on startup).
 static void D3D9Log(const char* psz)
 {
@@ -54,7 +56,32 @@ BOOL D3D9Init(HWND hwnd, int iWidth, int iHeight, BOOL bFullScreen)
 	typedef IDirect3D9* (WINAPI *pfnDirect3DCreate9)(UINT);
 
 	if (s_bInited)
+	{
+		// Track the screen size: if the raster was resized (e.g. the config dialog
+		// rewrote Width/Height and bCreateScreen re-ran), resize the windowed
+		// backbuffer with a cheap windowed Reset. The upload texture is keyed to
+		// the old size — drop it (it is MANAGED, so it would otherwise survive
+		// the Reset and hold stale UVs).
+		if ((int)s_pp.BackBufferWidth != iWidth || (int)s_pp.BackBufferHeight != iHeight)
+		{
+			s_pp.BackBufferWidth  = (UINT)iWidth;
+			s_pp.BackBufferHeight = (UINT)iHeight;
+			if (s_pTex2D)
+			{
+				s_pTex2D->Release();
+				s_pTex2D = NULL;
+				s_iTex2DWidth = 0;
+				s_iTex2DHeight = 0;
+			}
+			if (s_pDevice)
+			{
+				s_pDevice->Reset(&s_pp);
+				D3D9SetViewportFull();
+			}
+			D3D9Log("Init: device resized (windowed Reset)");
+		}
 		return TRUE;
+	}
 
 	if (!hwnd)
 		return FALSE;
@@ -196,7 +223,25 @@ BOOL D3D9Reset(void)
 	if (!s_pDevice)
 		return FALSE;
 	HRESULT hr = s_pDevice->Reset(&s_pp);
+	if (SUCCEEDED(hr))
+		D3D9SetViewportFull();
 	return SUCCEEDED(hr);
+}
+
+// Set the viewport to the full backbuffer (windowed Reset restores this, but the
+// 3D path may change it — Present2D must always cover the whole backbuffer).
+static void D3D9SetViewportFull(void)
+{
+	if (!s_pDevice)
+		return;
+	D3DVIEWPORT9 vp;
+	vp.X = 0;
+	vp.Y = 0;
+	vp.Width  = s_pp.BackBufferWidth;
+	vp.Height = s_pp.BackBufferHeight;
+	vp.MinZ = 0.0f;
+	vp.MaxZ = 1.0f;
+	s_pDevice->SetViewport(&vp);
 }
 
 void* D3D9GetDevice(void)
@@ -253,6 +298,8 @@ static BOOL D3D9CheckDeviceReset(void)
 			s_pTex2D = NULL;
 		}
 		hr = s_pDevice->Reset(&s_pp);
+		if (SUCCEEDED(hr))
+			D3D9SetViewportFull();
 	}
 	return hr == D3D_OK;
 }
@@ -292,21 +339,36 @@ void D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch)
 	Convert565To8888(pSrc, lr.pBits, iWidth, iHeight, iSrcPitch, (int)lr.Pitch);
 	s_pTex2D->UnlockRect(0);
 
-	// Fullscreen textured quad.
+	// Size the quad to the ACTUAL backbuffer (the window may have been resized or
+	// the device Reset at a different size) — never clip to a stale 640x480.
+	D3DSURFACE_DESC d;
+	d.Width  = s_pp.BackBufferWidth;
+	d.Height = s_pp.BackBufferHeight;
+	IDirect3DSurface9* pb = NULL;
+	if (SUCCEEDED(s_pDevice->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &pb)))
+	{
+		pb->GetDesc(&d);
+		pb->Release();
+	}
+	const float fW = (float)d.Width;
+	const float fH = (float)d.Height;
+
+	// Fullscreen textured quad (backbuffer coords).
 	const float fU1 = (float)iWidth  / D3D9_TEX_W;
 	const float fV1 = (float)iHeight / D3D9_TEX_H;
 	struct QuadVert { float x, y, z, rhw; float u, v; };
 	QuadVert aVerts[6] =
 	{
-		{ 0.0f,        0.0f,        0.5f, 1.0f, 0.0f, 0.0f },
-		{ (float)iWidth, 0.0f,     0.5f, 1.0f, fU1,  0.0f },
-		{ (float)iWidth, (float)iHeight, 0.5f, 1.0f, fU1,  fV1 },
-		{ 0.0f,        0.0f,        0.5f, 1.0f, 0.0f, 0.0f },
-		{ (float)iWidth, (float)iHeight, 0.5f, 1.0f, fU1,  fV1 },
-		{ 0.0f,        (float)iHeight, 0.5f, 1.0f, 0.0f, fV1 },
+		{ 0.0f,  0.0f, 0.5f, 1.0f, 0.0f, 0.0f },
+		{ fW,    0.0f, 0.5f, 1.0f, fU1,  0.0f },
+		{ fW,    fH,   0.5f, 1.0f, fU1,  fV1 },
+		{ 0.0f,  0.0f, 0.5f, 1.0f, 0.0f, 0.0f },
+		{ fW,    fH,   0.5f, 1.0f, fU1,  fV1 },
+		{ 0.0f,  fH,   0.5f, 1.0f, 0.0f, fV1 },
 	};
 
 	s_pDevice->BeginScene();
+	D3D9SetViewportFull();
 	s_pDevice->SetRenderState(D3DRS_ZENABLE,       FALSE);
 	s_pDevice->SetRenderState(D3DRS_CULLMODE,      D3DCULL_NONE);
 	s_pDevice->SetRenderState(D3DRS_ALPHABLENDENABLE,

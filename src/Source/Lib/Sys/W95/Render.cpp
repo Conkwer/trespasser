@@ -236,18 +236,33 @@ int iGetScreenBitdepth();
 
 		bIsFullScreen = i_screen_bits != 0;
 
+		// D3D9 mode: the screen raster is a plain sysmem staging buffer (no flip
+		// chain/primary/palette). Recreating it at the SAME size churns a DDraw
+		// surface destroy+create through dgVoodoo2's DDraw.dll while the D3D9
+		// device (also wrapped) is alive — that crashed quit-to-menu (bug 1).
+		bool bReuseD3D9Raster = false;
+		if (g_iRenderer == 2 && prasMainScreen)
+		{
+			if (prasMainScreen->iWidthFront  == i_screen_width &&
+				prasMainScreen->iHeightFront == i_screen_height)
+				bReuseD3D9Raster = true;
+		}
+
 		// if we have a sky remove its reference to the main screen
-		if (gpskyRender)
+		if (gpskyRender && !bReuseD3D9Raster)
 		{
 			gpskyRender->RemoveRenderSurface();
 		}
 
-		// We must destroy the current screen before creating a new one, or DirectDraw complains.
-		destroy(&prasMainScreen);
+		if (!bReuseD3D9Raster)
+		{
+			// We must destroy the current screen before creating a new one, or DirectDraw complains.
+			destroy(&prasMainScreen);
 
-		// Create a new instance of prasMainScreen.
-		prasMainScreen = rptr_new CRasterWin(hwndMain, i_screen_width, i_screen_height, i_screen_bits, 
-			                                 3, Set(erasVideoMem) * !b_system_mem);
+			// Create a new instance of prasMainScreen.
+			prasMainScreen = rptr_new CRasterWin(hwndMain, i_screen_width, i_screen_height, i_screen_bits, 
+				                                 3, Set(erasVideoMem) * !b_system_mem);
+		}
 
 		// Clear the render cache heap.
 		fxhHeap.Reset();
@@ -312,6 +327,13 @@ int iGetScreenBitdepth();
 	bool CRenderShell::bChangeRenderer(uint u_driver)
 	{
 		if (u_driver >= sapRenderDesc.uLen)
+			return false;
+
+		// D3D9 mode fixes the renderer: a user driver switch would re-create the
+		// renderer on the uninitialized D3D3 driver while the D3D9 device owns the
+		// display. Allow the same-driver recreate used by bCreateScreen; refuse
+		// real switches (menubar Driver menu / config dialog).
+		if (g_iRenderer == 2 && u_driver != uCurrentDriver)
 			return false;
 
 		iIgnoreWinCommands++;

@@ -778,6 +778,16 @@ void CRenderWnd::SelectCurrentD3D()
 
 void CRenderWnd::OnSelectNewDriver()
 {
+	// D3D9 mode fixes the renderer: the in-process restart would re-run the
+	// D3D3 device enumeration and rewrite the config while the D3D9 device
+	// owns the display (bug 2). Refuse instead.
+	if (g_iRenderer == 2)
+	{
+		MsgDlg(NULL, MB_OK, "Trespasser-Plus",
+			"The renderer is fixed in DirectX9 mode.");
+		return;
+	}
+
 	// Set flag to cause the card selection dialog to pop up on startup.
     bSetInitFlag(false);
 
