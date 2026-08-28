@@ -18,7 +18,7 @@
 #include <DirectX/d3d9.h>
 #include <windows.h>
 #include <stdio.h>
-#include "DebugConsole.hpp"
+#include "Lib/Sys/DebugConsole.hpp"
 
 #include "Direct3D9API.h"
 
