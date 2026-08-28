@@ -297,8 +297,21 @@ private:
 		return true;
 	}
 
-	//******************************************************************************************
-	//
+//******************************************************************************************
+//
+// D3D9-mode screen raster: a GDI DIB section instead of a DirectDraw surface.
+// Win11's system ddraw.dll rejects an explicit 565 pixel format on sysmem
+// offscreens with DDERR_INVALIDPIXELFORMAT (0x887600d4) — dgVoodoo2 accepted it,
+// but dx9 mode must run without any DDraw wrapper. The DIB keeps 565 exactly.
+// (Singletons: dx9 mode has exactly one screen raster, prasMainScreen.)
+//******************************************************************************************
+static HDC      s_hdcDib    = NULL;
+static HBITMAP  s_hbmDib    = NULL;
+static void*    s_pBitsDib  = NULL;
+static int      s_iDibPitch = 0;
+
+//******************************************************************************************
+//
 	bool bConstructD3D9SysRam
 	(
 		int i_width,	// The desired dimensions of the raster.
@@ -306,38 +319,52 @@ private:
 		int i_bits		// Bit depth (16).
 	)
 	//
-	// Creates a system-memory offscreen screen raster for D3D9 mode. D3D9 owns the
-	// display; this surface is only the CPU-side raster (GDI text, captions, movies)
-	// that CRasterWin::Flip uploads via the D3D9 driver.
+	// Creates the CPU-side screen raster for D3D9 mode as a GDI DIB section.
+	// D3D9 owns the display; this raster is only the software raster (GDI text,
+	// captions, movies) that CRasterWin::Flip uploads via the D3D9 driver.
 	//
 	//**************************************
 	{
-		CDDSize<DDSURFACEDESC> sd;
-
-		// System-memory offscreen surface, 16bpp 565 (matching the game's pxf).
-		sd.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT;
-		sd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN | DDSCAPS_SYSTEMMEMORY;
-		sd.dwWidth  = RoundUp(i_width, 8);
-		sd.dwHeight = i_height;
-		sd.ddpfPixelFormat.dwSize = sizeof(DDPIXELFORMAT);
-		sd.ddpfPixelFormat.dwFlags = DDPF_RGB;
-		sd.ddpfPixelFormat.dwRGBBitCount = 16;
-		sd.ddpfPixelFormat.dwRBitMask = 0xF800;
-		sd.ddpfPixelFormat.dwGBitMask = 0x07E0;
-		sd.ddpfPixelFormat.dwBBitMask = 0x001F;
-
-		HRESULT hres = DirectDraw::pdd->CreateSurface(&sd, &pddsDraw, 0);
-		if (FAILED(hres) || !pddsDraw)
+		if (s_hbmDib)
 		{
-			dprintf("D3D9: bConstructD3D9SysRam FAILED (%dx%d) hr=0x%08x\n",
-				i_width, i_height, (unsigned)hres);
+			DeleteObject(s_hbmDib);
+			s_hbmDib = NULL;
+		}
+		if (s_hdcDib)
+		{
+			DeleteDC(s_hdcDib);
+			s_hdcDib = NULL;
+		}
+		s_pBitsDib = NULL;
+
+		// 16bpp 565 top-down DIB (row 0 at the start of the bits — matches the
+		// game's linear row-first drawing).
+		BITMAPINFO bi;
+		ZeroMemory(&bi, sizeof(bi));
+		bi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+		bi.bmiHeader.biWidth       = i_width;
+		bi.bmiHeader.biHeight      = -i_height;
+		bi.bmiHeader.biPlanes      = 1;
+		bi.bmiHeader.biBitCount    = 16;
+		bi.bmiHeader.biCompression = BI_BITFIELDS;
+		((DWORD*)bi.bmiColors)[0] = 0xF800;
+		((DWORD*)bi.bmiColors)[1] = 0x07E0;
+		((DWORD*)bi.bmiColors)[2] = 0x001F;
+
+		s_hdcDib = CreateCompatibleDC(NULL);
+		s_hbmDib = CreateDIBSection(NULL, &bi, DIB_RGB_COLORS, &s_pBitsDib, NULL, 0);
+		if (!s_hdcDib || !s_hbmDib || !s_pBitsDib)
+		{
+			dprintf("D3D9: bConstructD3D9SysRam DIB FAILED (%dx%d)\n", i_width, i_height);
 			return false;
 		}
-		dprintf("D3D9: bConstructD3D9SysRam OK (%dx%d)\n", i_width, i_height);
-
-		// D3D9 owns the display — there is no DDraw primary surface in this mode.
+		SelectObject(s_hdcDib, s_hbmDib);
+		s_iDibPitch = (i_width * 2 + 3) & ~3;
+		pSurface    = s_pBitsDib;
+		pddsDraw    = 0;
 		pddsPrimary = 0;
-		bVideoMem = false;
+		bVideoMem   = false;
+		dprintf("D3D9: bConstructD3D9SysRam DIB OK (%dx%d)\n", i_width, i_height);
 		return true;
 	}
 
@@ -735,6 +762,14 @@ private:
 		if (bLocked)
 			return;
 
+		if (g_iRenderer == 2)
+		{
+			// D3D9 mode: the raster is a DIB section — no DirectDraw Lock needed.
+			pSurface = s_pBitsDib;
+			bLocked = 1;
+			return;
+		}
+
 		//
 		// If back surfaces are in system memory,
 		// we don't have to worry about Lock hanging the system.
@@ -750,6 +785,12 @@ private:
 	{
 		if (!bLocked)
 			return;
+		if (g_iRenderer == 2)
+		{
+			// D3D9 mode: the DIB has no lock to release.
+			bLocked = 0;
+			return;
+		}
 		DirectDraw::err = pddsDraw->Unlock(0);
 		bLocked = 0;
 	}
@@ -1003,6 +1044,10 @@ private:
 	//******************************************************************************************
 	HDC CRasterVid::hdcGet() 
 	{
+		// D3D9 mode: the raster is a DIB section — return its memory DC.
+		if (g_iRenderer == 2)
+			return s_hdcDib;
+
 		// Get the DC via DirectDraw's cumbersome interface.
 		HDC hdc = 0;
 		while (bRestore(pddsDraw->GetDC(&hdc)));
@@ -1012,6 +1057,9 @@ private:
 	//******************************************************************************************
 	void CRasterVid::ReleaseDC(HDC hdc) 
 	{
+		// D3D9 mode: a memory DC needs no release.
+		if (g_iRenderer == 2)
+			return;
 		DirectDraw::err = pddsDraw->ReleaseDC(hdc);
 	}
 
@@ -1504,18 +1552,10 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 					iWidthFront, iHeightFront, iWidth, iHeight);
 			}
 
-			if (pddsDraw)
-			{
-				DDSURFACEDESC dds;
-				ZeroMemory(&dds, sizeof(dds));
-				dds.dwSize = sizeof(dds);
-				if (SUCCEEDED(pddsDraw->Lock(NULL, &dds, DDLOCK_WAIT, NULL)))
-				{
-					if (dds.lpSurface)
-						D3D9Present2D(dds.lpSurface, iWidthFront, iHeightFront, (int)dds.lPitch);
-					pddsDraw->Unlock(NULL);
-				}
-			}
+			// D3D9 mode: the raster is a DIB section — upload its bits directly
+			// (no DDraw surface to lock).
+			if (s_pBitsDib)
+				D3D9Present2D(s_pBitsDib, iWidthFront, iHeightFront, s_iDibPitch);
 			return;
 		}
 

@@ -590,8 +590,10 @@ public:
 	//
     IDirectDrawSurface * GetPrimarySurface()
     {
-        // D3D9 mode has no primary surface — return the sysmem draw surface instead
-        // (SMK video and other GetPrimarySurface users draw into the raster's surface).
+        // D3D9 mode has no DDraw surfaces at all (the raster is a DIB) — callers
+        // must use the dx9 branches (hdcGet/raster Lock) instead.
+        if (g_iRenderer == 2)
+            return NULL;
         return pddsPrimary ? pddsPrimary : pddsDraw;
     }
 	//

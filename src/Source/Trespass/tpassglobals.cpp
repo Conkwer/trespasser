@@ -155,7 +155,15 @@ void CTPassGlobals::SetupBackground()
     HDC                     hdc;
 
     pSurface = prasMainScreen->GetPrimarySurface();
-    hr = pSurface->GetDC(&hdc);
+    if (g_iRenderer == 2)
+    {
+        // D3D9 mode: the raster is a DIB — wrap its memory DC.
+        hdc = prasMainScreen->hdcGet();
+    }
+    else
+    {
+        hr = pSurface->GetDC(&hdc);
+    }
 
     delete m_prasBkgnd;
     m_prasBkgnd = new CRasterDC(hdc,
@@ -202,11 +210,19 @@ void CTPassGlobals::CaptureBackground(bool bBackbuffer /* = false */)
         pSurface = prasMainScreen->GetPrimarySurface();
     }
 
-    hr = pSurface->GetDC(&hdcSrc);
-    if (FAILED(hr))
+    if (g_iRenderer == 2)
     {
-        dprintf("D3D9: CaptureBackground GetDC failed hr=0x%08x\n", (unsigned)hr);
-        return;
+        // D3D9 mode: the raster is a DIB — capture via its memory DC.
+        hdcSrc = prasMainScreen->hdcGet();
+    }
+    else
+    {
+        hr = pSurface->GetDC(&hdcSrc);
+        if (FAILED(hr))
+        {
+            dprintf("D3D9: CaptureBackground GetDC failed hr=0x%08x\n", (unsigned)hr);
+            return;
+        }
     }
 
     hdcDst = m_prasBkgnd->hdcGet();
@@ -221,7 +237,10 @@ void CTPassGlobals::CaptureBackground(bool bBackbuffer /* = false */)
            0,
            SRCCOPY);
 
-    pSurface->ReleaseDC(hdcSrc);
+    if (g_iRenderer == 2)
+        prasMainScreen->ReleaseDC(hdcSrc);
+    else
+        pSurface->ReleaseDC(hdcSrc);
     m_prasBkgnd->ReleaseDC(hdcDst);
 
     hdcDst = m_prasBkgnd->hdcGet();

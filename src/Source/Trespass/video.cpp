@@ -63,13 +63,21 @@ void CVideoWnd::NextDirect()
         SmackColorRemap(m_pSmack,m_pBuf->Palette,m_pBuf->MaxPalColors,m_pBuf->PalType);
     }
 
-    pSurface = prasMainScreen->GetPrimarySurface();
-    do
+    if (g_iRenderer == 2)
     {
-        hr = pSurface->GetDC(&hdc);
-        prasMainScreen->bRestore(hr);
+        // D3D9 mode: the raster is a DIB — draw via its memory DC.
+        hdc = prasMainScreen->hdcGet();
     }
-    while (hr == DDERR_SURFACELOST);
+    else
+    {
+        pSurface = prasMainScreen->GetPrimarySurface();
+        do
+        {
+            hr = pSurface->GetDC(&hdc);
+            prasMainScreen->bRestore(hr);
+        }
+        while (hr == DDERR_SURFACELOST);
+    }
 
     SmackDoFrame(m_pSmack);
 
@@ -88,7 +96,10 @@ void CVideoWnd::NextDirect()
         }
     }
 
-    pSurface->ReleaseDC(hdc);
+    if (g_iRenderer == 2)
+        prasMainScreen->ReleaseDC(hdc);
+    else
+        pSurface->ReleaseDC(hdc);
 }
 
 
@@ -298,27 +309,36 @@ BOOL CVideoWnd::Play(LPCSTR pszFile)
 		memset(&dds, 0, sizeof(dds));
 		dds.dwSize = sizeof(dds);
 
-		do
+		if (g_iRenderer == 2)
 		{
-			hr = pSurface->Lock(NULL, 
-								&dds, 
-								DDLOCK_SURFACEMEMORYPTR | DDLOCK_WAIT, 
-								NULL);
-			prasMainScreen->bRestore(hr);
+			// D3D9 mode: no DDraw surface to probe — the raster is a DIB, use the
+			// HDC (direct) path.
+			m_fDirect = TRUE;
 		}
-		while (hr == DDERR_SURFACELOST);
+		else
+		{
+			do
+			{
+				hr = pSurface->Lock(NULL, 
+									&dds, 
+									DDLOCK_SURFACEMEMORYPTR | DDLOCK_WAIT, 
+									NULL);
+				prasMainScreen->bRestore(hr);
+			}
+			while (hr == DDERR_SURFACELOST);
 
-        if ((LPBYTE)dds.lpSurface == NULL)
-        {
-            Trace(("Video going Direct to primary surface"));
-            m_fDirect = TRUE;
-        }
-        else
-        {
-            m_fDirect = FALSE;
-        }
+			if ((LPBYTE)dds.lpSurface == NULL)
+			{
+				Trace(("Video going Direct to primary surface"));
+				m_fDirect = TRUE;
+			}
+			else
+			{
+				m_fDirect = FALSE;
+			}
 
-        pSurface->Unlock(dds.lpSurface);
+			pSurface->Unlock(dds.lpSurface);
+		}
     }
 
     if (m_fDirect)

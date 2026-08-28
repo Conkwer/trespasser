@@ -1128,14 +1128,20 @@ void ScreenCapture()
 	// Save out a blank bitmap if a real one cannot be found.
 
     pSurface = prasMainScreen->GetPrimarySurface();
-    hr = pSurface->GetDC(&hdcSrc);
+    if (g_iRenderer == 2)
+        hdcSrc = prasMainScreen->hdcGet();
+    else
+        hr = pSurface->GetDC(&hdcSrc);
 
 	SetStretchBltMode(hdcDst, COLORONCOLOR);
 	StretchBlt(hdcDst, 0, 0, pras24->iWidth, pras24->iHeight,
 			   hdcSrc, 0, 0, prasMainScreen->iWidthFront, prasMainScreen->iHeightFront,
 			   SRCCOPY);
 
-	pSurface->ReleaseDC(hdcSrc);
+	if (g_iRenderer == 2)
+		prasMainScreen->ReleaseDC(hdcSrc);
+	else
+		pSurface->ReleaseDC(hdcSrc);
 	pras24->ReleaseDC(hdcDst);
 
     dib.Create(pras24->iWidth, pras24->iHeight, 24, 0);
@@ -1191,9 +1197,23 @@ void MiddleMessage(UINT uiIDS)
     int                     iBkMode;
 
     pSurface = prasMainScreen->GetPrimarySurface();
-    if (pSurface == NULL)
+    if (g_iRenderer == 2)
     {
-        return;
+        // D3D9 mode: the raster is a DIB — capture via its memory DC.
+        hdcSrc = prasMainScreen->hdcGet();
+    }
+    else
+    {
+        if (pSurface == NULL)
+        {
+            return;
+        }
+
+        hr = pSurface->GetDC(&hdcSrc);
+        if (FAILED(hr))
+        {
+            return;
+        }
     }
 
     LoadString(g_hInst, uiIDS, sz, sizeof(sz));
@@ -1203,12 +1223,6 @@ void MiddleMessage(UINT uiIDS)
             1, 
             prasMainScreen->iWidthFront + 1, 
             prasMainScreen->iHeightFront + 1);
-
-    hr = pSurface->GetDC(&hdcSrc);
-    if (FAILED(hr))
-    {
-        return;
-    }
 
     cr = GetTextColor(hdcSrc);
 
