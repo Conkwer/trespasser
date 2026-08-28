@@ -30,7 +30,7 @@
 #endif
 #ifndef _HMONITOR_DEFINED
 #define _HMONITOR_DEFINED
-typedef HANDLE HMONITOR;
+typedef void* HMONITOR;
 #endif
 
 
