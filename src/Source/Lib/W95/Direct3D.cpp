@@ -935,6 +935,32 @@ public:
 	//*****************************************************************************************
 	DDPIXELFORMAT CDirect3D::ddpfGetPixelFormat(ED3DTextureType ed3dtex) const
 	{
+		// D3D9 mode (Track C): the D3D6 EnumTextureFormats never runs (no D3D6 device),
+		// so ddpfFormats stays zeroed — return the fixed D3D9 texture formats instead
+		// (565 opaque, 1555 alpha/transparent — matches D3D9CreateTexture).
+		if (g_iRenderer == 2)
+		{
+			DDPIXELFORMAT ddpf;
+			memset(&ddpf, 0, sizeof(ddpf));
+			ddpf.dwSize       = sizeof(DDPIXELFORMAT);
+			ddpf.dwFlags      = DDPF_RGB;
+			ddpf.dwRGBBitCount = 16;
+			if (ed3dtex == ed3dtexSCREEN_OPAQUE)
+			{
+				ddpf.dwRBitMask = 0xF800;
+				ddpf.dwGBitMask = 0x07E0;
+				ddpf.dwBBitMask = 0x001F;
+			}
+			else
+			{
+				ddpf.dwFlags |= DDPF_ALPHAPIXELS;
+				ddpf.dwRBitMask = 0x7C00;
+				ddpf.dwGBitMask = 0x03E0;
+				ddpf.dwBBitMask = 0x001F;
+			}
+			return ddpf;
+		}
+
 		Assert(ddpfFormats[ed3dtex].dwSize);
 
 		return ddpfFormats[ed3dtex];
