@@ -1662,8 +1662,10 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 			if (s_pBitsDib)
 				D3D9Present2D(s_pBitsDib, iWidthFront, iHeightFront, s_iDibPitch);
 
-			// Trespasser-Plus debug helper: periodic screenshot dumps.
-			if (g_bScreenshot)
+			// Trespasser-Plus debug helper: periodic screenshot dumps. Only on 3D
+			// hardware frames — the loading screen / menus are 2D presents and would
+			// otherwise fill the dump with the progress dialog.
+			if (g_bScreenshot && D3D9IsHardwareFrame())
 				DumpScreenshot();
 			return;
 		}

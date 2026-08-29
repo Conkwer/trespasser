@@ -39,6 +39,7 @@ BOOL  D3D9Present(void);
 // full-frame present (menus, loading, movies, pause). The hardware-frame flag is consumed
 // (reset) by this call.
 void  D3D9SetHardwareFrame(BOOL bHardwareFrame);
+BOOL  D3D9IsHardwareFrame(void);
 void  D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch);
 
 // Device-lost handling for real d3d9 (alt-tab/UAC). D3D9CheckDevice returns TRUE when

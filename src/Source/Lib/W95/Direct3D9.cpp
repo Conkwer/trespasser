@@ -562,6 +562,11 @@ void D3D9SetHardwareFrame(BOOL bHardwareFrame)
 	s_bHardwareFrame = bHardwareFrame;
 }
 
+BOOL D3D9IsHardwareFrame(void)
+{
+	return s_bHardwareFrame;
+}
+
 // Throttled diagnostic: log a message at most every ~5 seconds (the present runs
 // every frame — a failing present would otherwise spam the log).
 static void D3D9Diag(const char* psz)
