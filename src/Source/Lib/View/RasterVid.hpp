@@ -602,10 +602,6 @@ public:
 	//
 	//**********************************
 
-	//******************************************************************************************
-	// Track C: copy the D3D9 backbuffer into the DIB raster (called at the
-	// hardware->software transitions in CScreenRenderAuxD3D). dx9 mode only.
-	bool D3D9RasterReadback();
 
 	//******************************************************************************************
 	//
@@ -690,3 +686,7 @@ private:
 };
 
 #endif
+
+// Track C: copy the D3D9 backbuffer into the DIB raster (called at the hardware->software
+// transitions in CScreenRenderAuxD3D). dx9 mode only.
+bool D3D9RasterReadback();
