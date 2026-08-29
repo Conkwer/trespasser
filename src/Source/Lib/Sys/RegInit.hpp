@@ -242,6 +242,9 @@ BOOL bGetD3D
 // Trespasser-Plus renderer selection (0=software, 1=DX6, 2=DX9). Set from
 // [TrespasserPlus] Renderer= in OpenKey(); consumed by bGetD3D() and the D3D9 driver.
 extern int g_iRenderer;
+// True when [TrespasserPlus] Renderer=software was written explicitly — forces the
+// software path even if a leftover legacy "Use D3D"=1 exists.
+extern bool g_bRendererSoftwareExplicit;
 
 //*********************************************************************************************
 //

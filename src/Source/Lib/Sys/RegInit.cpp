@@ -174,6 +174,7 @@ void SetD3D(BOOL b_d3d)
 
 // Trespasser-Plus: renderer selection parsed from [TrespasserPlus] Renderer=.
 int g_iRenderer = 0; // 0=software, 1=DX6 (legacy D3D path), 2=DX9 (new backend)
+bool g_bRendererSoftwareExplicit = false; // Renderer=software was written explicitly
 
 //*********************************************************************************************
 BOOL bGetD3D()
@@ -186,6 +187,11 @@ BOOL bGetD3D()
 	// in CRenderShell::bCreateScreen when g_iRenderer==2.
 	if (g_iRenderer == 2)
 		return FALSE;
+	// Renderer=software (explicit) must not fall through to the legacy "Use D3D" key
+	// either — a leftover Use D3D=1 would silently enable the D3D6 path.
+	if (g_bRendererSoftwareExplicit)
+		return FALSE;
+	// No/empty Renderer key (old configs): keep the legacy "Use D3D" behavior.
 	return GetRegValue(strFLAG_D3D, DEFAULT_D3D) != 0;
 }
 
