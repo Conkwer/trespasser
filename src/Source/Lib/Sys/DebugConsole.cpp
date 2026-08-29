@@ -180,6 +180,9 @@ bool	bDebugLogFile = true;
 			{
 				// write the same string to the file
 				dbgfile << buf;
+				dbgfile.flush();  // Trespasser-Plus: the file stream was never flushed on
+				                  // newline — a crash/hang lost the log tail, so DebugLog.txt
+				                  // looked truncated at the wrong place (false crash site).
 			}
 
 			u4Off = 0;

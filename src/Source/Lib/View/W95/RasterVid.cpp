@@ -403,9 +403,12 @@ private:
 		{
 			bFullScreen = false;
 			bFlippable  = false;
-			if (bConstructD3D9SysRam(i_width, i_height, i_bits))
-				return;
-			// Fall through to the software path on failure.
+			// Never fall through to the DDraw software path: on Win11 the explicit
+			// 565 sysmem format is rejected (DDERR_INVALIDPIXELFORMAT — the original
+			// black-screen bug) and half-built DDraw surfaces would break the present.
+			bConstructD3D9SysRam(i_width, i_height, i_bits);
+			return;
+		}
 		}
 
 		if (i_bits) 
@@ -961,6 +964,13 @@ private:
 		// Now we just need to check that the second one is, otherwise punt back to CRaster::Blit.
 		//
 
+		// D3D9 mode: no DDraw surfaces to blit with — use the CPU blit.
+		if (g_iRenderer == 2)
+		{
+			CRaster::Blit(i_dx, i_dy, ras_src, prect_src, b_clip, b_colour_key, pix_colour_key);
+			return;
+		}
+
 		CRasterVid* prasv_src;
 
 		if (!(prasv_src = dynamic_cast<CRasterVid*>(&ras_src)))
@@ -1333,7 +1343,7 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 				SetRaster(i_width, i_height, 16, s_iDibPitch, &pxf);
 				u4DDSFlags  = 0;
 				fAspectRatio = (float)i_width / i_height / fMONITOR_ASPECT;
-				eClearMethod  = ecmTEST;
+				eClearMethod  = ecmDWI;   // dx9: force the CPU clear (ecmDD blits through NULL pddsDraw)
 				i4ClearTiming = 0;
 				bLocked       = 0;
 				ClearBorder();
@@ -1758,6 +1768,11 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 	void CRasterWin::ClearBorder(bool bBackBuffer /* = false */)
 	{
         IDirectDrawSurface *    pdds;
+
+		// D3D9 mode: the present quad covers the whole backbuffer — no border to
+		// clear, and there is no primary surface/clipper to clear it with anyway.
+		if (g_iRenderer == 2)
+			return;
 
 		// if the render surface and screen surface are the same size then we do not need to
 		// do anything because there is no border.
