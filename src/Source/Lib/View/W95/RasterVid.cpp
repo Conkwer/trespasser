@@ -87,6 +87,8 @@ static HDC      s_hdcDib    = NULL;
 static HBITMAP  s_hbmDib    = NULL;
 static void*    s_pBitsDib  = NULL;
 static int      s_iDibPitch = 0;
+static int      s_iDibWidth = 0;
+static int      s_iDibHeight = 0;
 #include "Lib/Std/PrivSelf.hpp"
 #include "Lib/Renderer/ScreenRenderAuxD3D.hpp"
 #include "Lib/W95/Direct3DCards.hpp"
@@ -365,6 +367,8 @@ private:
 		}
 		SelectObject(s_hdcDib, s_hbmDib);
 		s_iDibPitch = (i_width * 2 + 3) & ~3;
+		s_iDibWidth = i_width;
+		s_iDibHeight = i_height;
 		pSurface    = s_pBitsDib;
 		pddsDraw    = 0;
 		pddsPrimary = 0;
@@ -1752,7 +1756,7 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 	{
 		if (g_iRenderer != 2 || !s_pBitsDib)
 			return false;
-		return D3D9ReadbackToDIB(s_pBitsDib, iWidthFront, iHeightFront, s_iDibPitch);
+		return D3D9ReadbackToDIB(s_pBitsDib, s_iDibWidth, s_iDibHeight, s_iDibPitch);
 	}
 
 	//******************************************************************************************
