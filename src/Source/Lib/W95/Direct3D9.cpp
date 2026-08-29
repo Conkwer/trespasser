@@ -723,4 +723,7 @@ void D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch)
 
 	// The hardware-frame flag is consumed by this present.
 	s_bHardwareFrame = FALSE;
+
+	// Track C diagnostics: per-second perf counters.
+	D3D9FramePresented();
 }
