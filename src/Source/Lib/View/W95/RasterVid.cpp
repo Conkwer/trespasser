@@ -1324,6 +1324,22 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 			// Construct a regular DirectDraw interface.
 			priv_self.ConstructSoftware(hwnd, i_width, i_height, i_bits, i_buffers, seteras);
 
+			// D3D9 mode: the raster is a GDI DIB — there are no DDraw surfaces,
+			// clipper, or gamma control. Set the raster format directly from the
+			// DIB (16bpp 565) and skip every DDraw-dependent step below.
+			if (g_iRenderer == 2)
+			{
+				CPixelFormat pxf(16, 0xF800, 0x07E0, 0x001F);
+				SetRaster(i_width, i_height, 16, s_iDibPitch, &pxf);
+				u4DDSFlags  = 0;
+				fAspectRatio = (float)i_width / i_height / fMONITOR_ASPECT;
+				eClearMethod  = ecmTEST;
+				i4ClearTiming = 0;
+				bLocked       = 0;
+				ClearBorder();
+				return;
+			}
+
 			// Create a DirectDrawClipper object, needed for the window.
 			if (!bFullScreen)
 			{
