@@ -26,6 +26,7 @@ extern void __cdecl dprintf(char* str, ...);
 static HMODULE             s_hD3D9   = NULL;
 static IDirect3D9*         s_pD3D9   = NULL;
 static IDirect3DDevice9*   s_pDevice = NULL;
+static BOOL                s_bHwDrawn = FALSE;   // R2 readback latch
 
 // Track C diagnostics: per-frame readback count + total cost, logged once per second.
 static DWORD   s_dwReadbacksPerSec = 0;
@@ -298,10 +299,57 @@ void* D3D9GetRenderTarget(void)
 // Track C: raw D3D9 device calls for the CD3D9Device façade.
 //*******************************************************************************************
 
+// Last FOGCOLOR the game set (state 34). Used as the per-frame clear colour (R5(1))
+// — the D3D6 flip-clear used the fog colour; a black clear shows wherever neither
+// sky, terrain nor water draws (the horizon "black band").
+static DWORD s_dwFogColour = 0x00000000;
+
 void D3D9SetRenderState(DWORD dwState, DWORD dwValue)
 {
+	if (dwState == 34 /* D3DRS_FOGCOLOR */)
+		s_dwFogColour = dwValue;
 	if (s_pDevice)
 		s_pDevice->SetRenderState((D3DRENDERSTATETYPE)dwState, dwValue);
+}
+
+DWORD D3D9GetRenderState(DWORD dwState)
+{
+	DWORD dwVal = 0;
+	if (s_pDevice)
+		s_pDevice->GetRenderState((D3DRENDERSTATETYPE)dwState, &dwVal);
+	return dwVal;
+}
+
+DWORD D3D9GetTextureStageState(DWORD dwStage, DWORD dwTss)
+{
+	DWORD dwVal = 0;
+	if (s_pDevice)
+		s_pDevice->GetTextureStageState(dwStage, (D3DTEXTURESTAGESTATETYPE)dwTss, &dwVal);
+	return dwVal;
+}
+
+DWORD D3D9GetSamplerState(DWORD dwStage, DWORD dwSamp)
+{
+	DWORD dwVal = 0;
+	if (s_pDevice)
+		s_pDevice->GetSamplerState(dwStage, (D3DSAMPLERSTATETYPE)dwSamp, &dwVal);
+	return dwVal;
+}
+
+void* D3D9GetTexture(DWORD dwStage)
+{
+	IDirect3DBaseTexture9* pt = NULL;
+	if (s_pDevice)
+		s_pDevice->GetTexture(dwStage, &pt);
+	return pt;
+}
+
+DWORD D3D9GetFVF(void)
+{
+	DWORD dwFvf = 0;
+	if (s_pDevice)
+		s_pDevice->GetFVF(&dwFvf);
+	return dwFvf;
 }
 
 void D3D9SetTextureStageState(DWORD dwStage, DWORD dwTss, DWORD dwValue)
@@ -352,9 +400,17 @@ BOOL D3D9DrawPrimitiveUP(DWORD dwPrimType, DWORD dwVertexCount, const void* pVer
 
 	if (s_dwFVF)
 		s_pDevice->SetFVF(s_dwFVF);
-	return SUCCEEDED(s_pDevice->DrawPrimitiveUP((D3DPRIMITIVETYPE)dwPrimType,
+	BOOL bOk = SUCCEEDED(s_pDevice->DrawPrimitiveUP((D3DPRIMITIVETYPE)dwPrimType,
 		dwPrimCount, pVerts, dwStride));
+	if (bOk)
+		s_bHwDrawn = TRUE;   // R2 readback latch — any real hardware draw
+	return bOk;
 }
+
+// R2 readback latch (peek/clear — the façade's sky End() also routes through
+// D3D9DrawPrimitiveUP, so every hardware draw sets the latch).
+BOOL D3D9HwDrawnPeek(void) { return s_bHwDrawn; }
+void D3D9HwDrawnClear(void) { s_bHwDrawn = FALSE; }
 
 void* D3D9CreateTexture(int iWidth, int iHeight, DWORD dwFormat)
 {
@@ -510,8 +566,11 @@ BOOL D3D9ClearTargetZ(DWORD dwColor)
 	if (s_bClearedThisFrame)
 		return TRUE;   // already cleared this frame
 	s_bClearedThisFrame = TRUE;
+	// R5(1): clear to the last FOGCOLOR the game set (the D3D6 flip-clear cleared
+	// to the fog colour). The dwColor param is vestigial (the caller always passes
+	// black); the fog colour defaults to black before the game's first FOGCOLOR.
 	return SUCCEEDED(s_pDevice->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER,
-		dwColor, 0.0f, 0));
+		s_dwFogColour, 0.0f, 0));
 }
 
 //*******************************************************************************************
@@ -703,6 +762,27 @@ void D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch)
 
 	s_pDevice->BeginScene();
 	D3D9SetViewportFull();
+
+	// R0: this 2D quad clobbers ~10 device states (Z, cull, blend, texture stage 0,
+	// filters, texture 0, FVF). The game's d3dstState caches never re-send values
+	// they believe are live, and COLOROP has NO other writer in the whole process
+	// (D3D6 TEXTUREMAPBLEND is a façade no-op) — so the leak was permanent: every
+	// 3D frame after the first menu present rendered with SELECTARG1/TEXTURE (fills
+	// white, diffuse ignored), Z disabled (objects pop), and texture0=s_pTex2D.
+	// Snapshot before, restore after (reverse order).
+	DWORD dwZen      = D3D9GetRenderState(D3DRS_ZENABLE);
+	DWORD dwCull     = D3D9GetRenderState(D3DRS_CULLMODE);
+	DWORD dwAlphaBl  = D3D9GetRenderState(D3DRS_ALPHABLENDENABLE);
+	DWORD dwSrcBlend = D3D9GetRenderState(D3DRS_SRCBLEND);
+	DWORD dwDstBlend = D3D9GetRenderState(D3DRS_DESTBLEND);
+	DWORD dwColorOp  = D3D9GetTextureStageState(0, D3DTSS_COLOROP);
+	DWORD dwColorArg = D3D9GetTextureStageState(0, D3DTSS_COLORARG1);
+	DWORD dwAlphaOp  = D3D9GetTextureStageState(0, D3DTSS_ALPHAOP);
+	DWORD dwMag      = D3D9GetSamplerState(0, D3DSAMP_MAGFILTER);
+	DWORD dwMin      = D3D9GetSamplerState(0, D3DSAMP_MINFILTER);
+	void* pTex0      = D3D9GetTexture(0);
+	DWORD dwFvf      = D3D9GetFVF();
+
 	s_pDevice->SetRenderState(D3DRS_ZENABLE,       FALSE);
 	s_pDevice->SetRenderState(D3DRS_CULLMODE,      D3DCULL_NONE);
 	s_pDevice->SetRenderState(D3DRS_ALPHABLENDENABLE,
@@ -719,6 +799,22 @@ void D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch)
 	s_pDevice->SetFVF(D3DFVF_XYZRHW | D3DFVF_TEX1);
 	s_pDevice->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2, aVerts, sizeof(QuadVert));
 	s_pDevice->EndScene();
+
+	// Restore (reverse order — reverse of the quad's Set* sequence).
+	s_pDevice->SetFVF(dwFvf);
+	s_pDevice->SetSamplerState(0, D3DSAMP_MINFILTER, dwMin);
+	s_pDevice->SetSamplerState(0, D3DSAMP_MAGFILTER, dwMag);
+	s_pDevice->SetTextureStageState(0, D3DTSS_ALPHAOP,   dwAlphaOp);
+	s_pDevice->SetTextureStageState(0, D3DTSS_COLORARG1, dwColorArg);
+	s_pDevice->SetTextureStageState(0, D3DTSS_COLOROP,   dwColorOp);
+	s_pDevice->SetTexture(0, (IDirect3DTexture9*)pTex0);
+	if (pTex0)   // GetTexture ADDs a ref — balance it
+		((IDirect3DTexture9*)pTex0)->Release();
+	s_pDevice->SetRenderState(D3DRS_DESTBLEND, dwDstBlend);
+	s_pDevice->SetRenderState(D3DRS_SRCBLEND, dwSrcBlend);
+	s_pDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, dwAlphaBl);
+	s_pDevice->SetRenderState(D3DRS_CULLMODE, dwCull);
+	s_pDevice->SetRenderState(D3DRS_ZENABLE, dwZen);
 	{
 		HRESULT hrPresent = s_pDevice->Present(NULL, NULL, NULL, NULL);
 		if (FAILED(hrPresent))

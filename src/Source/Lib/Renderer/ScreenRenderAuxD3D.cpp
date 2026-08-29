@@ -674,6 +674,14 @@ public:
 			float f_blue  = float(clrDefEndDepth.u1Blue)  / 255.0f;
 
 			d3dcolFog = D3DRGBA(f_red, f_green, f_blue, 0.0f);
+
+			// R3: the fog colour was only sent by the D3D6 init path (CPriv::SetFog) —
+			// in dx9 the device kept D3D9's default fog colour = WHITE, which made the
+			// specular-alpha fog blend toward white (the "winter look"). Re-send the
+			// per-scene colour here (state 34 passes through the façade). The fog
+			// FACTOR is read from the vertex specular alpha (FOGVERTEXMODE=NONE at
+			// D3D9Init), which the game already packs per vertex — no baking needed.
+			d3dDriver.pGetDevice()->SetRenderState(D3DRENDERSTATE_FOGCOLOR, d3dcolFog);
 		}
 
 		// Always start with a software lock.
@@ -719,6 +727,12 @@ public:
 	//******************************************************************************************
 	void CScreenRenderAuxD3D::FlushBatch()
 	{
+		// R2: in dx9 the Lock/Unlock DIB sync is pure waste — rendering goes to the
+		// D3D9 backbuffer, not the DIB, so nothing blocks; and each toggle here fired
+		// a readback (now latched, but still an unnecessary hw->sw->hw round trip).
+		if (g_iRenderer == 2)
+			return;
+
 		bool b_hardware = ed3drMode == ed3drHARDWARE_LOCK;
 
 		// Toggle hardware off.

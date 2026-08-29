@@ -78,6 +78,21 @@ void  D3D9SetFVF(DWORD dwFvf);
 BOOL  D3D9DrawPrimitiveUP(DWORD dwPrimType, DWORD dwVertexCount, const void* pVerts,
                           DWORD dwStride);
 
+// State snapshot (used by D3D9Present2D to save/restore the states its 2D quad
+// clobbers — see R0, the unifying state-leak fix). D3D9GetTexture returns the
+// borrowed stage-0 texture pointer.
+DWORD  D3D9GetRenderState(DWORD dwState);
+DWORD  D3D9GetTextureStageState(DWORD dwStage, DWORD dwTss);
+DWORD  D3D9GetSamplerState(DWORD dwStage, DWORD dwSamp);
+void*  D3D9GetTexture(DWORD dwStage);
+DWORD  D3D9GetFVF(void);
+
+// Hardware-drew latch (R2 readback suppression): set TRUE by every DrawPrimitiveUP,
+// peeked by D3D9RasterReadback (early-out unless TRUE) and cleared on a successful
+// readback. Dedups all hw->sw transitions in a frame to exactly 1 readback.
+BOOL   D3D9HwDrawnPeek(void);
+void   D3D9HwDrawnClear(void);
+
 // Texture creation/locking for the CRasterD3D texture twin. fmt is a D3DFMT_* value.
 void* D3D9CreateTexture(int iWidth, int iHeight, DWORD dwFormat);
 BOOL  D3D9LockTexture(void* pTex, void** ppBits, int* piPitch);
