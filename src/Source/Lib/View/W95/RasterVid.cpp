@@ -1591,16 +1591,6 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 
 		// If single surface, return.
 
-	//******************************************************************************************
-	// Track C: copy the D3D9 backbuffer (the hardware 3D frame) into the DIB raster so
-	// the software remainder + all 2D draw on top of a complete 3D frame. Called at the
-	// hardware→software transitions in CScreenRenderAuxD3D (SetD3DModePriv / EndScene).
-	bool D3D9RasterReadback()
-	{
-		if (g_iRenderer != 2 || !s_pBitsDib)
-			return false;
-		return D3D9ReadbackToDIB(s_pBitsDib, iWidthFront, iHeightFront, s_iDibPitch);
-	}
 		if (pddsPrimary == pddsDraw)
 			return;
 
@@ -1752,6 +1742,17 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 			// deactivated.
 			//
 		}
+	}
+
+	//******************************************************************************************
+	// Track C: copy the D3D9 backbuffer (the hardware 3D frame) into the DIB raster so
+	// the software remainder + all 2D draw on top of a complete 3D frame. Called at the
+	// hardware→software transitions in CScreenRenderAuxD3D (SetD3DModePriv / EndScene).
+	bool D3D9RasterReadback()
+	{
+		if (g_iRenderer != 2 || !s_pBitsDib)
+			return false;
+		return D3D9ReadbackToDIB(s_pBitsDib, iWidthFront, iHeightFront, s_iDibPitch);
 	}
 
 	//******************************************************************************************

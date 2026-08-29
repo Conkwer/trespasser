@@ -273,7 +273,7 @@ void* D3D9GetRenderTarget(void)
 		return NULL;
 	if (s_pRenderTarget)
 	{
-		s_pRenderTarget->Release();
+		((IDirect3DSurface9*)s_pRenderTarget)->Release();
 		s_pRenderTarget = NULL;
 	}
 	if (FAILED(s_pDevice->GetRenderTarget(0, (IDirect3DSurface9**)&s_pRenderTarget)))
