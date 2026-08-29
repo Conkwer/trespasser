@@ -1835,6 +1835,10 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 	// the software remainder + all 2D draw on top of a complete 3D frame. Called at the
 	// hardware→software transitions in CScreenRenderAuxD3D (SetD3DModePriv / EndScene).
 
+	BOOL D3D9Is3DFrame(void)
+	{
+		return s_b3DFrame;
+	}
 
 	bool D3D9RasterReadback()
 	{
