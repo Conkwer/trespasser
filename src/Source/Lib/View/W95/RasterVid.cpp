@@ -409,7 +409,6 @@ private:
 			bConstructD3D9SysRam(i_width, i_height, i_bits);
 			return;
 		}
-		}
 
 		if (i_bits) 
 		{		
