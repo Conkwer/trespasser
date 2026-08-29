@@ -177,6 +177,15 @@ void OpenKey()
 	// matching the sharp ATX/CE look instead of the bilinear blur. Default 1 (bilinear).
 	extern bool g_bFilterTextures;
 	g_bFilterTextures = GetModValue(REG_KEY_FILTER, DEFAULT_FILTER) != 0;
+
+	// Debug helpers: Autoload=<levelcode> (skip the menu), Screenshot=1 + ScreenshotTimeout=N
+	// (periodic DIB dumps from CRasterWin::Flip).
+	g_szAutoloadLevel[0] = 0;
+	GetModString(REG_KEY_AUTOLOAD_LEVEL, g_szAutoloadLevel, sizeof(g_szAutoloadLevel), "");
+	g_bScreenshot = GetModValue(REG_KEY_SCREENSHOT, 0) != 0;
+	g_iScreenshotTimeout = GetModValue(REG_KEY_SCREENSHOT_TIMEOUT, 10);
+	if (g_iScreenshotTimeout < 1)
+		g_iScreenshotTimeout = 1;
 }
 
 void CloseKey(BOOL b_change_safemode)

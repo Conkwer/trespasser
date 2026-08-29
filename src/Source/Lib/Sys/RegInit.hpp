@@ -115,6 +115,9 @@
 #define REG_KEY_LANGUAGE            "Language"
 #define REG_KEY_FILTER              "Filter"
 #define REG_KEY_RENDERER            "Renderer"
+#define REG_KEY_AUTOLOAD_LEVEL      "Autoload"
+#define REG_KEY_SCREENSHOT          "Screenshot"
+#define REG_KEY_SCREENSHOT_TIMEOUT  "ScreenshotTimeout"
 
 // Registry entries for error handling.
 #define REG_KEY_AUTOSAVE            "Auto Save"
@@ -245,6 +248,14 @@ extern int g_iRenderer;
 // True when [TrespasserPlus] Renderer=software was written explicitly — forces the
 // software path even if a leftover legacy "Use D3D"=1 exists.
 extern bool g_bRendererSoftwareExplicit;
+
+// Debug helpers (all optional):
+//   Autoload=<levelcode>  — skip the menu and load data\<levelcode> directly at startup.
+//   Screenshot=1          — dump the presented DIB to screenshot_%04d.bmp every N sec.
+//   ScreenshotTimeout=N   — seconds between screenshots (default 10).
+extern char g_szAutoloadLevel[32];
+extern bool g_bScreenshot;
+extern int  g_iScreenshotTimeout;
 
 //*********************************************************************************************
 //

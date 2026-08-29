@@ -175,6 +175,9 @@ void SetD3D(BOOL b_d3d)
 // Trespasser-Plus: renderer selection parsed from [TrespasserPlus] Renderer=.
 int g_iRenderer = 0; // 0=software, 1=DX6 (legacy D3D path), 2=DX9 (new backend)
 bool g_bRendererSoftwareExplicit = false; // Renderer=software was written explicitly
+char g_szAutoloadLevel[32] = "";   // Autoload=<levelcode> — skip the menu (set in reg.cpp)
+bool g_bScreenshot        = false; // Screenshot=1 — periodic DIB dumps (set in reg.cpp)
+int  g_iScreenshotTimeout = 10;    // ScreenshotTimeout=N — seconds between dumps
 
 //*********************************************************************************************
 BOOL bGetD3D()

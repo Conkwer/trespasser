@@ -668,6 +668,19 @@ void CMainWnd::GameLoop()
 		g_CTPassGlobals.LoadScene(szDir, NULL);
 		i = 2;
 	}
+	else if (g_szAutoloadLevel[0])
+	{
+		// Trespasser-Plus debug helper: Autoload=<levelcode> — load data\<levelcode>
+		// directly, skipping the menu (same path as the New Game dialog's LoadLevel).
+		char szDir[_MAX_PATH];
+		GetRegString(REG_KEY_DATA_DRIVE, szDir, sizeof(szDir), "");
+		strcat(szDir, "data\\");
+		strcat(szDir, g_szAutoloadLevel);
+
+		dprintf("Autoload: loading %s\n", szDir);
+		g_CTPassGlobals.LoadScene(szDir, NULL);
+		i = 2;
+	}
 
     bQuit = FALSE;
 

@@ -1567,6 +1567,77 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 	}
 
 	//******************************************************************************************
+	// Trespasser-Plus debug helper: Screenshot=1 + ScreenshotTimeout=N dumps the presented
+	// DIB (the exact frame the Flip uploads) to screenshot_%04d.bmp in the CWD every N
+	// seconds. 565 top-down -> 24-bit BGR BMP.
+	static void DumpScreenshot()
+	{
+		static DWORD s_dwLastShot = 0;
+		static int   s_iShotNum = 0;
+
+		DWORD dwNow = GetTickCount();
+		if (dwNow - s_dwLastShot < DWORD(g_iScreenshotTimeout * 1000))
+			return;
+		s_dwLastShot = dwNow;
+
+		if (!s_pBitsDib || s_iDibWidth <= 0 || s_iDibHeight <= 0)
+			return;
+
+		char szFile[_MAX_PATH];
+		wsprintf(szFile, "screenshot_%04d.bmp", ++s_iShotNum);
+		HANDLE hFile = CreateFile(szFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL, NULL);
+		if (hFile == INVALID_HANDLE_VALUE)
+			return;
+
+		int iW = s_iDibWidth;
+		int iH = s_iDibHeight;
+		DWORD dwRowBytes = (DWORD)iW * 3;
+		DWORD dwPad = (4 - (dwRowBytes & 3)) & 3;
+		DWORD dwPixBytes = (dwRowBytes + dwPad) * (DWORD)iH;
+		DWORD dwFileSize = 14 + 40 + dwPixBytes;
+
+		BITMAPFILEHEADER bfh;
+		BITMAPINFOHEADER bih;
+		memset(&bfh, 0, sizeof(bfh));
+		memset(&bih, 0, sizeof(bih));
+		bfh.bfType = 0x4D42;                    // "BM"
+		bfh.bfSize = dwFileSize;
+		bfh.bfOffBits = 14 + 40;
+		bih.biSize = sizeof(BITMAPINFOHEADER);
+		bih.biWidth = iW;
+		bih.biHeight = -iH;                     // top-down
+		bih.biPlanes = 1;
+		bih.biBitCount = 24;
+		bih.biCompression = BI_RGB;
+		bih.biSizeImage = dwPixBytes;
+
+		DWORD dwWritten = 0;
+		WriteFile(hFile, &bfh, 14, &dwWritten, NULL);
+		WriteFile(hFile, &bih, 40, &dwWritten, NULL);
+
+		// Convert 565 -> 24-bit BGR rows (top-down, padded to 4 bytes).
+		unsigned char aRow[4096 * 3 + 4];
+		for (int y = 0; y < iH; ++y)
+		{
+			const unsigned short* pSrc = (const unsigned short*)((const char*)s_pBitsDib + y * s_iDibPitch);
+			unsigned char* pDst = aRow;
+			for (int x = 0; x < iW; ++x)
+			{
+				unsigned short px = pSrc[x];
+				pDst[0] = (unsigned char)(((px & 0x1F) * 255) / 31);        // B
+				pDst[1] = (unsigned char)((((px >> 5) & 0x3F) * 255) / 63);  // G
+				pDst[2] = (unsigned char)((((px >> 11) & 0x1F) * 255) / 31); // R
+				pDst += 3;
+			}
+			WriteFile(hFile, aRow, dwRowBytes + dwPad, &dwWritten, NULL);
+		}
+
+		CloseHandle(hFile);
+		dprintf("D3D9: screenshot saved %s\n", szFile);
+	}
+
+	//******************************************************************************************
 	void CRasterWin::Flip() 
 	{
 		// D3D9 mode: upload the CPU-side raster to the D3D9 backbuffer and present.
@@ -1590,6 +1661,10 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 			// (no DDraw surface to lock).
 			if (s_pBitsDib)
 				D3D9Present2D(s_pBitsDib, iWidthFront, iHeightFront, s_iDibPitch);
+
+			// Trespasser-Plus debug helper: periodic screenshot dumps.
+			if (g_bScreenshot)
+				DumpScreenshot();
 			return;
 		}
 
