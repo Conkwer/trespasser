@@ -480,9 +480,16 @@ void D3D9FramePresented(void)
 		s_dwFramesPerSec++;
 		if (++s_dwSeconds >= 60)
 		{
+			DWORD dwNow = GetTickCount();
+			static DWORD s_dwLastLog = 0;
+			DWORD dwElapsed = dwNow - s_dwLastLog;
+			s_dwLastLog = dwNow;
 			s_dwSeconds = 0;
-			dprintf("D3D9: perf frames=%u prims=%u readbacks=%u (%.2f/frame) readbackMs=%u (%.2f/frame)\n",
-				s_dwFramesPerSec, s_dwPrimsPerSec, s_dwReadbacksPerSec,
+			if (dwElapsed < 100)
+				dwElapsed = 100;   // first window — no baseline yet
+			dprintf("D3D9: perf frames=%u (%.1f fps) prims=%u readbacks=%u (%.2f/frame) readbackMs=%u (%.2f/frame)\n",
+				s_dwFramesPerSec, double(s_dwFramesPerSec) * 1000.0 / dwElapsed,
+				s_dwPrimsPerSec, s_dwReadbacksPerSec,
 				s_dwFramesPerSec ? double(s_dwReadbacksPerSec) / s_dwFramesPerSec : 0.0,
 				s_dwReadbackMsPerSec,
 				s_dwFramesPerSec ? double(s_dwReadbackMsPerSec) / s_dwFramesPerSec : 0.0);
