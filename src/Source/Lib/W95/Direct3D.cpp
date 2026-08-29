@@ -751,6 +751,9 @@ public:
 #endif // VER_DEBUG
 		PrintD3D(">>>>>>New direct 3d device created\n");
 
+		// Track the device in the D3D6-signature façade (dx6 mode forwards through it).
+		D3D9RenderDevice().BindD3D6(pDevice);
+
 		//3D->EvictManagedTextures();
 
 		// Set device description and capability structures.
@@ -910,6 +913,7 @@ public:
 			pDevice = 0;
 			PrintD3D2(">>>>>>New direct 3d device released (%ld).\n", i_ref);
 		}
+		D3D9RenderDevice().BindD3D6(0);
 
 		// Turn off water alpha.
 		CEntityWater::bAlpha = false;

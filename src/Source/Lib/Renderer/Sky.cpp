@@ -3892,7 +3892,7 @@ void CSkyRender::FillD3D
 	D3DCOLOR d3drgb_plaina = D3DRGBA(1, 1, 1, 1);
 
 	// Setup Direct3D for this polygon.
-	LPDIRECT3DDEVICE3 pdevice = d3dDriver.pGetDevice();	// Copy of the device pointer.
+	CD3D9Device* pdevice = d3dDriver.pGetDevice();	// Copy of the device pointer.
 	Assert(pdevice);
 
 	d3dDriver.err = pdevice->Begin
@@ -3924,7 +3924,7 @@ void CSkyRender::DrawD3D
 
 	float f_offset_x = 0.0f;
 	float f_offset_y = 0.0f;
-	LPDIRECT3DDEVICE3 pdevice = d3dDriver.pGetDevice();	// Copy of the device pointer.
+	CD3D9Device* pdevice = d3dDriver.pGetDevice();	// Copy of the device pointer.
 
 	//
 	// Initialize the sky for Direct3D if it has not already been initialized.

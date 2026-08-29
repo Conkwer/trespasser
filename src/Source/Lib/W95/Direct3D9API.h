@@ -51,6 +51,50 @@ BOOL  D3D9Reset(void);
 void* D3D9GetDevice(void);
 void* D3D9GetD3D(void);
 
+// Borrowed pointer to the current render target surface (used by the readback).
+void* D3D9GetRenderTarget(void);
+
+//-------------------------------------------------------------------------------------------
+// Track C: raw D3D9 device calls for the CD3D9Device façade (Lib/W95/D3D9Device.cpp).
+// All state values are D3D9's own (the façade translates the D3D6 enums before calling).
+//-------------------------------------------------------------------------------------------
+
+// Render state (D3DRS_* value, D3D9 numeric value).
+void  D3D9SetRenderState(DWORD dwState, DWORD dwValue);
+
+// Texture stage state (D3DTSS_* value — D3D9 kept the D3D6 numbers for the stages it has).
+void  D3D9SetTextureStageState(DWORD dwStage, DWORD dwTss, DWORD dwValue);
+
+// Sampler state (D3DSAMP_* value).
+void  D3D9SetSamplerState(DWORD dwStage, DWORD dwSamp, DWORD dwValue);
+
+// Texture binding. pTex is an IDirect3DTexture9* (the D3D6-side callers pass their
+// pd3dtexGet() pointer, which is a void* in both modes; the façade reinterprets it).
+void  D3D9SetTexture(DWORD dwStage, void* pTex);
+
+// Vertex format cache + DrawPrimitiveUP (D3D9 primitive type = D3D6 type value).
+void  D3D9SetFVF(DWORD dwFvf);
+BOOL  D3D9DrawPrimitiveUP(DWORD dwPrimType, DWORD dwVertexCount, const void* pVerts,
+                          DWORD dwStride);
+
+// Texture creation/locking for the CRasterD3D texture twin. fmt is a D3DFMT_* value.
+void* D3D9CreateTexture(int iWidth, int iHeight, DWORD dwFormat);
+BOOL  D3D9LockTexture(void* pTex, void** ppBits, int* piPitch);
+void  D3D9UnlockTexture(void* pTex);
+void  D3D9ReleaseTexture(void* pTex);
+
+// Backbuffer readback: copies the current backbuffer into a 16bpp 565 destination
+// (the DIB raster). Used at hardware->software transitions in the mixed frame.
+BOOL  D3D9ReadbackToDIB(void* pDibBits, int iWidth, int iHeight, int iDibPitch);
+
+// Tell the driver a frame was presented (resets the per-frame clear flag and the
+// scene machine so the next hardware BeginScene clears target+Z again).
+void  D3D9FramePresented(void);
+
+// Clear target+Z once per frame (the D3D6 flip-clear equivalent). The flag is reset
+// by D3D9FramePresented. Returns TRUE when the clear ran (or was already done).
+BOOL  D3D9ClearTargetZ(DWORD dwColor);
+
 #ifdef __cplusplus
 }
 #endif

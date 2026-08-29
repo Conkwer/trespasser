@@ -281,6 +281,8 @@ SOURCE=.\Source\Lib\W95\Direct3D.hpp
 # Begin Source File
 
 SOURCE=.\Source\Lib\W95\Direct3D9API.h
+SOURCE=.\Source\Lib\W95\D3D9Device.hpp
+
 # End Source File
 # Begin Source File
 

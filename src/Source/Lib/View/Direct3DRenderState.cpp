@@ -147,8 +147,9 @@ bool g_bFilterTextures = true;
 	//*********************************************************************************************
 	void CDirect3DRenderState::SetAllowZBuffer(bool b_state)
 	{
-		// Do nothing if the state is correct.
-		if (bAllowZBuffer == b_state || !d3dDriver.pGetDevice())
+		// Do nothing if the state is correct, or no D3D6 device is bound in dx6 mode
+		// (the D3D9 façade no-ops safely, so only the dx6 case needs the guard).
+		if (bAllowZBuffer == b_state || (!bD3D9Active() && !d3dDriver.pGetDevice()->bIsValid()))
 			return;
 
 		if (b_state)

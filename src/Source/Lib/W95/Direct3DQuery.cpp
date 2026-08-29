@@ -413,7 +413,7 @@ private:
 	int                  iHeight;
 	int                  iStride;
 	EScreenFormats       esfScreenFormat;
-	LPDIRECT3DDEVICE3    pDevice;
+	CD3D9Device*         pDevice;
 	LPDIRECT3DVIEWPORT3  pViewport;
 	LPDIRECTDRAWSURFACE4 pddsBack;			// Pointer to the DirectDraw backbuffer.
 	LPDIRECTDRAWSURFACE4 pddsFront;			// Pointer to the DirectDraw frontbuffer.

@@ -703,6 +703,11 @@ public:
 				d3dstState.SetTextureNull();
 				d3dDriver.err = d3dDriver.pGetDevice()->EndScene();
 				bBusy = false;
+
+				// D3D9 mode: read the hardware frame back into the DIB (the software
+				// remainder and 2D are drawn on top before the Flip uploads it).
+				if (g_iRenderer == 2)
+					D3D9RasterReadback();
 				break;
 			default:
 				Assert(0);
@@ -755,6 +760,11 @@ public:
 				d3dstState.SetTextureNull();
 				Verify(d3dDriver.pGetDevice()->EndScene() == DD_OK);
 				bBusy = false;
+
+				// D3D9 mode: the hardware scene closed - copy the backbuffer into the
+				// DIB raster so the software remainder and 2D draw on top of the 3D frame.
+				if (g_iRenderer == 2)
+					D3D9RasterReadback();
 				break;
 
 			case ed3drHARDWARE_LOCK:

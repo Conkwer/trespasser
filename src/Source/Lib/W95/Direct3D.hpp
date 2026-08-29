@@ -301,6 +301,20 @@ enum EMemoryModel
 };
 
 
+#include "Lib/W95/D3D9Device.hpp"
+
+// D3D9 mode is active (Renderer=dx9): the D3D9 driver owns the display; the D3D6
+// device is never created. Caps report hardware-true so the existing hardware
+// pipeline (the aux renderer) routes everything through the CD3D9Device façade.
+// (g_iRenderer is declared in Lib/Sys/RegInit.hpp; declared here to keep this
+// header self-contained.)
+extern int g_iRenderer;
+
+forceinline bool bD3D9Active()
+{
+	return g_iRenderer == 2;
+}
+
 //
 // Class definitions.
 //
@@ -512,15 +526,16 @@ public:
 	
 	//*****************************************************************************************
 	//
-	forceinline LPDIRECT3DDEVICE3 pGetDevice
+	forceinline CD3D9Device* pGetDevice
 	(
 	)
 	//
-	// Returns the D3D device pointer.
+	// Returns the D3D device — the real D3D6 device in dx6 mode (wrapped for the
+	// D3D6-signature surface), the D3D9 façade in dx9 mode.
 	//
 	//**************************************
 	{
-		return pDevice;
+		return &D3D9RenderDevice();
 	}
 	
 	//*****************************************************************************************
@@ -607,7 +622,7 @@ public:
 	//**************************************
 	{
 		Assert((bUse && bEnableInit) || !bUse);
-		return bUse;
+		return bD3D9Active() || bUse;
 	}
 	
 	//*****************************************************************************************
@@ -620,7 +635,8 @@ public:
 	//
 	//**************************************
 	{
-		return bPageManaged;
+		// D3D9 textures are D3DPOOL_MANAGED — never the D3D6 page-managed scheme.
+		return !bD3D9Active() && bPageManaged;
 	}
 	
 	//*****************************************************************************************
@@ -700,7 +716,7 @@ public:
 	//
 	//**************************************
 	{
-		return bUse;
+		return bD3D9Active() || bUse;
 	}
 	
 	//*****************************************************************************************
@@ -726,7 +742,7 @@ public:
 	//
 	//**************************************
 	{
-		return bUse && bD3DCacheFog;
+		return (bD3D9Active() || (bUse && bD3DCacheFog));
 	}
 	
 	//*****************************************************************************************
@@ -767,7 +783,7 @@ public:
 	//**************************************
 	{
 		Assert((bUse && bEnableInit) || !bUse);
-		return bUse;
+		return bD3D9Active() || bUse;
 	}
 	
 	//*****************************************************************************************
@@ -801,7 +817,7 @@ public:
 	//
 	//**************************************
 	{
-		return bUse && bModulatedAlpha && bHardwareWater;
+		return (bD3D9Active() || bUse) && bModulatedAlpha && bHardwareWater;
 	}
 	
 	//*****************************************************************************************
@@ -1097,7 +1113,7 @@ public:
 	//
 	//**************************************
 	{
-		return bFullTexturing && bUse;
+		return bD3D9Active() || (bFullTexturing && bUse);
 	}
 	
 	//*****************************************************************************************
@@ -1148,7 +1164,7 @@ public:
 	//
 	//**************************************
 	{
-		return bModulatedAlpha;
+		return bD3D9Active() || bModulatedAlpha;
 	}
 	
 	//*****************************************************************************************

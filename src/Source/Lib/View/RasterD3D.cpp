@@ -212,6 +212,8 @@
 #include "Lib/View/Direct3DRenderState.hpp"
 #include "Lib/Renderer/ScreenRenderAuxD3D.hpp"
 #include "Lib/View/AGPTextureMemManager.hpp"
+#include "Lib/W95/Direct3D9API.h"
+#include "Lib/Sys/RegInit.hpp"
 
 #include <memory.h>
 
@@ -689,17 +691,37 @@ public:
 		// Construct our RasterSurface member.
 		new(&RasterSurface) CRasterSurface(*this, iPixelBits);
 
-		// Create a new DirectDraw surface for the system memory version of the texture.
-		priv_self.bCreateSysMemSurface(ed3dtexType);
+		if (g_iRenderer != 2)
+		{
+			// Create a new DirectDraw surface for the system memory version of the texture.
+			priv_self.bCreateSysMemSurface(ed3dtexType);
 
-		// Create a new DirectDraw surface for the video version of the texture.
-		priv_self.bCreateVidMemSurface();
+			// Create a new DirectDraw surface for the video version of the texture.
+			priv_self.bCreateVidMemSurface();
 
-		// Set the colour key for transparent textures.
-	#if bCOLOUR_KEY
-		if (ed3dtex == ed3dtexSCREEN_TRANSPARENT)
-			priv_self.SetColourKey();
-	#endif
+		#if bCOLOUR_KEY
+			if (ed3dtex == ed3dtexSCREEN_TRANSPARENT)
+				priv_self.SetColourKey();
+		#endif
+		}
+		else
+		{
+			// D3D9 mode (Track C): the texture is a single-level MANAGED D3D9 texture.
+			// Lock/Unlock map to LockRect/UnlockRect and bUpload is a no-op (the CPU
+			// conversion writes straight into the managed texture). Formats:
+			// opaque = R5G6B5; alpha/transparent = A1R5G5B5 (the 1555 source layout
+			// is copied raw by ConvertRasterAlpha; the alpha bit feeds the alpha-test
+			// in place of the D3D6 colour key).
+			DWORD dwFmt = (ed3dtexType == ed3dtexSCREEN_OPAQUE) ? 23 : 25;
+			pd3dtexTex = (LPDIRECT3DTEXTURE2)D3D9CreateTexture(iWidth, iHeight, dwFmt);
+			if (pd3dtexTex)
+			{
+				// Report the device layout so the conversion table targets it correctly.
+				pxf = CPixelFormat(16,
+					(ed3dtexType == ed3dtexSCREEN_OPAQUE) ? 0xF800 : 0x7C00,
+					0x07E0, 0x001F);
+			}
+		}
 
 		// Add to stats.
 		proProfile.psTextures.Add(0, 1);
@@ -746,6 +768,22 @@ public:
 	//******************************************************************************************
 	void CRasterD3D::Lock()
 	{
+		if (g_iRenderer == 2)
+		{
+			// D3D9 mode: lock the MANAGED texture directly (LockRect).
+			if (bLocked)
+				return;
+			void* pBits;
+			int   iPitch;
+			if (!pd3dtexTex || !D3D9LockTexture(pd3dtexTex, &pBits, &iPitch))
+				return;
+			++iLockCount;
+			pSurface    = pBits;
+			iLinePixels = iPitch / 2;
+			bLocked     = true;
+			return;
+		}
+
 		LPDIRECTDRAWSURFACE4 pdds = pddsSurfaceSys;
 
 		Assert(pdds);
@@ -776,6 +814,17 @@ public:
 	//******************************************************************************************
 	void CRasterD3D::Unlock()
 	{
+		if (g_iRenderer == 2)
+		{
+			if (!bLocked)
+				return;
+			--iLockCount;
+			if (pd3dtexTex)
+				D3D9UnlockTexture(pd3dtexTex);
+			bLocked = false;
+			return;
+		}
+
 		LPDIRECTDRAWSURFACE4 pdds = pddsSurfaceSys;
 		Assert(pdds);
 
@@ -801,6 +850,10 @@ public:
 	//******************************************************************************************
 	bool CRasterD3D::bUpload()
 	{
+		// D3D9 mode: the MANAGED texture is the direct target — nothing to upload.
+		if (g_iRenderer == 2)
+			return pd3dtexTex != 0;
+
 		bool b_succeeded = true;
 
 		// Do nothing if the texture is already uploaded or D3D is not being used.
@@ -873,6 +926,10 @@ public:
 	//******************************************************************************************
 	bool CRasterD3D::bUpload(int i_x, int i_y, int i_width, int i_height)
 	{
+		// D3D9 mode: the MANAGED texture is the direct target — nothing to upload.
+		if (g_iRenderer == 2)
+			return pd3dtexTex != 0;
+
 		if (!d3dDriver.bUseD3D())
 			return true;
 

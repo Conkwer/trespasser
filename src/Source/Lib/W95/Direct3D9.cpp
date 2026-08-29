@@ -160,6 +160,11 @@ BOOL D3D9Init(HWND hwnd, int iWidth, int iHeight, BOOL bFullScreen)
 			(unsigned)s_pp.BackBufferWidth, (unsigned)s_pp.BackBufferHeight);
 		D3D9Log(szInit);
 	}
+
+	// RHW fog: the game carries the per-vertex fog factor in specular ALPHA
+	// (0xFF = no fog). D3D9 must not apply table/vertex fog math on top.
+	s_pDevice->SetRenderState(D3DRS_FOGVERTEXMODE, D3DFOG_NONE);
+	s_pDevice->SetRenderState(D3DRS_FOGTABLEMODE,  D3DFOG_NONE);
 	return TRUE;
 }
 
@@ -256,6 +261,192 @@ void* D3D9GetDevice(void)
 void* D3D9GetD3D(void)
 {
 	return s_pD3D9;
+}
+
+// The current render target (backbuffer surface) — used by the readback. The returned
+// pointer is borrowed (do not release); GetRenderTargetData takes it as its first arg.
+static void* s_pRenderTarget = NULL;
+
+void* D3D9GetRenderTarget(void)
+{
+	if (!s_pDevice)
+		return NULL;
+	if (s_pRenderTarget)
+	{
+		s_pRenderTarget->Release();
+		s_pRenderTarget = NULL;
+	}
+	if (FAILED(s_pDevice->GetRenderTarget(0, (IDirect3DSurface9**)&s_pRenderTarget)))
+		return NULL;
+	return s_pRenderTarget;
+}
+
+//*******************************************************************************************
+// Track C: raw D3D9 device calls for the CD3D9Device façade.
+//*******************************************************************************************
+
+void D3D9SetRenderState(DWORD dwState, DWORD dwValue)
+{
+	if (s_pDevice)
+		s_pDevice->SetRenderState((D3DRENDERSTATETYPE)dwState, dwValue);
+}
+
+void D3D9SetTextureStageState(DWORD dwStage, DWORD dwTss, DWORD dwValue)
+{
+	if (s_pDevice)
+		s_pDevice->SetTextureStageState(dwStage, (D3DTEXTURESTAGESTATETYPE)dwTss, dwValue);
+}
+
+void D3D9SetSamplerState(DWORD dwStage, DWORD dwSamp, DWORD dwValue)
+{
+	if (s_pDevice)
+		s_pDevice->SetSamplerState(dwStage, (D3DSAMPLERSTATETYPE)dwSamp, dwValue);
+}
+
+void D3D9SetTexture(DWORD dwStage, void* pTex)
+{
+	if (s_pDevice)
+		s_pDevice->SetTexture(dwStage, (IDirect3DTexture9*)pTex);
+}
+
+static DWORD s_dwFVF = 0;
+
+void D3D9SetFVF(DWORD dwFvf)
+{
+	s_dwFVF = dwFvf;
+}
+
+BOOL D3D9DrawPrimitiveUP(DWORD dwPrimType, DWORD dwVertexCount, const void* pVerts,
+                         DWORD dwStride)
+{
+	if (!s_pDevice || !pVerts)
+		return FALSE;
+	if (s_dwFVF)
+		s_pDevice->SetFVF(s_dwFVF);
+	return SUCCEEDED(s_pDevice->DrawPrimitiveUP((D3DPRIMITIVETYPE)dwPrimType,
+		dwVertexCount, pVerts, dwStride));
+}
+
+void* D3D9CreateTexture(int iWidth, int iHeight, DWORD dwFormat)
+{
+	if (!s_pDevice)
+		return NULL;
+	IDirect3DTexture9* pt = NULL;
+	// MANAGED: survives device resets; CPU LockRect is cheap and direct.
+	if (FAILED(s_pDevice->CreateTexture(iWidth, iHeight, 1, 0,
+		(D3DFORMAT)dwFormat, D3DPOOL_MANAGED, &pt, NULL)))
+		return NULL;
+	return pt;
+}
+
+BOOL D3D9LockTexture(void* pTex, void** ppBits, int* piPitch)
+{
+	if (!pTex)
+		return FALSE;
+	D3DLOCKED_RECT lr;
+	if (FAILED(((IDirect3DTexture9*)pTex)->LockRect(0, &lr, NULL, 0)))
+		return FALSE;
+	*ppBits  = lr.pBits;
+	*piPitch = (int)lr.Pitch;
+	return TRUE;
+}
+
+void D3D9UnlockTexture(void* pTex)
+{
+	if (pTex)
+		((IDirect3DTexture9*)pTex)->UnlockRect(0);
+}
+
+void D3D9ReleaseTexture(void* pTex)
+{
+	if (pTex)
+		((IDirect3DTexture9*)pTex)->Release();
+}
+
+// Readback staging surface (sysmem offscreen-plain, same size as the backbuffer).
+static IDirect3DSurface9* s_pReadback = NULL;
+static int s_iReadbackW = 0;
+static int s_iReadbackH = 0;
+
+// X8R8G8B8 -> RGB565 (inverse of Convert565To8888).
+static void Convert8888To565(const void* pSrc, void* pDst, int iWidth, int iHeight,
+                             int iSrcPitch, int iDstPitch)
+{
+	const char* ps = (const char*)pSrc;
+	char*       pd = (char*)pDst;
+	for (int y = 0; y < iHeight; y++)
+	{
+		const DWORD* psRow = (const DWORD*)(ps + y * iSrcPitch);
+		WORD*        pdRow = (WORD*)(pd + y * iDstPitch);
+		for (int x = 0; x < iWidth; x++)
+		{
+			DWORD px = psRow[x];
+			int   r  = (px >> 16) & 0xFF;
+			int   g  = (px >> 8)  & 0xFF;
+			int   b  = px & 0xFF;
+			pdRow[x] = (WORD)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+		}
+	}
+}
+
+BOOL D3D9ReadbackToDIB(void* pDibBits, int iWidth, int iHeight, int iDibPitch)
+{
+	if (!s_pDevice || !pDibBits)
+		return FALSE;
+
+	// Lazy-create the staging surface at the backbuffer size.
+	IDirect3DSurface9* pb = NULL;
+	if (FAILED(s_pDevice->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &pb)))
+		return FALSE;
+	D3DSURFACE_DESC d;
+	pb->GetDesc(&d);
+	pb->Release();
+
+	if (!s_pReadback || s_iReadbackW != (int)d.Width || s_iReadbackH != (int)d.Height)
+	{
+		if (s_pReadback)
+		{
+			s_pReadback->Release();
+			s_pReadback = NULL;
+		}
+		s_pDevice->CreateOffscreenPlainSurface(d.Width, d.Height, D3DFMT_X8R8G8B8,
+			D3DPOOL_SYSTEMMEM, &s_pReadback, NULL);
+		s_iReadbackW = (int)d.Width;
+		s_iReadbackH = (int)d.Height;
+	}
+	if (!s_pReadback)
+		return FALSE;
+
+	if (FAILED(s_pDevice->GetRenderTargetData(
+			(IDirect3DSurface9*)D3D9GetRenderTarget(), s_pReadback)))
+		return FALSE;
+
+	D3DLOCKED_RECT lr;
+	if (FAILED(s_pReadback->LockRect(&lr, NULL, D3DLOCK_READONLY)))
+		return FALSE;
+	Convert8888To565(lr.pBits, pDibBits, iWidth, iHeight, (int)lr.Pitch, iDibPitch);
+	s_pReadback->UnlockRect();
+	return TRUE;
+}
+
+// Per-frame clear flag: the façade clears target+Z on the first hardware BeginScene
+// of each frame (D3D6 clears after each flip); reset by D3D9FramePresented.
+static BOOL s_bClearedThisFrame = FALSE;
+
+void D3D9FramePresented(void)
+{
+	s_bClearedThisFrame = FALSE;
+}
+
+BOOL D3D9ClearTargetZ(DWORD dwColor)
+{
+	if (!s_pDevice)
+		return FALSE;
+	if (s_bClearedThisFrame)
+		return TRUE;   // already cleared this frame
+	s_bClearedThisFrame = TRUE;
+	return SUCCEEDED(s_pDevice->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER,
+		dwColor, 1.0f, 0));
 }
 
 //*******************************************************************************************
@@ -467,6 +658,10 @@ void D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch)
 			D3D9Log(szP);
 		}
 	}
+
+	// A frame was presented: reset the per-frame clear flag so the next hardware
+	// BeginScene clears target+Z again (Track C, the D3D6 flip-clear equivalent).
+	s_bClearedThisFrame = FALSE;
 
 	// The hardware-frame flag is consumed by this present.
 	s_bHardwareFrame = FALSE;
