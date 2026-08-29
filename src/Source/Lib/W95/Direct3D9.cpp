@@ -204,8 +204,12 @@ void D3D9EndScene(void)
 
 void D3D9Clear(DWORD dwColor)
 {
+	// Z-clear to 0.0 — the game's convention (Direct3D.cpp flip-clear uses Clear2 z=0.0
+	// with ZFUNC=GREATEREQUAL, i.e. 0=far, greatest=nearest). A 1.0 clear rejects
+	// every poly (0.5>=1.0 fails) → black world. The sky still drew because it
+	// disables the Z-buffer.
 	if (s_pDevice)
-		s_pDevice->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, dwColor, 1.0f, 0);
+		s_pDevice->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, dwColor, 0.0f, 0);
 }
 
 BOOL D3D9Present(void)
@@ -446,7 +450,7 @@ BOOL D3D9ClearTargetZ(DWORD dwColor)
 		return TRUE;   // already cleared this frame
 	s_bClearedThisFrame = TRUE;
 	return SUCCEEDED(s_pDevice->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER,
-		dwColor, 1.0f, 0));
+		dwColor, 0.0f, 0));
 }
 
 //*******************************************************************************************
