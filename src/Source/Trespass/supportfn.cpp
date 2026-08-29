@@ -939,6 +939,7 @@ void SetupGameScreen()
     int             iGore;
 
     bGetDimensions(iWidth, iHeight);
+	dprintf("D3D9: SetupGameScreen dims %dx%d\n", iWidth, iHeight);
 	Video::SetToValidMode(iWidth, iHeight);
 	SetDimensions(iWidth, iHeight);
     bSystemMem = bGetSystemMem();
@@ -950,6 +951,7 @@ void SetupGameScreen()
                              iHeight, 
                              16, 
                              bSystemMem);
+	dprintf("D3D9: SetupGameScreen bCreateScreen done, prasMainScreen=%p\n", prasMainScreen.ptPtrRaw());
 
     SetWindowPos(g_hwnd, NULL, -1, -1, iWidth, iHeight,  
                  SWP_NOMOVE | SWP_NOREDRAW | SWP_NOZORDER);

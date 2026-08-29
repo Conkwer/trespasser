@@ -521,15 +521,19 @@ void CTPassGlobals::HardScreenReset(BOOL b_reset_world)
 	}
 
 	d3dDriver.Purge();
+	dprintf("D3D9: HardScreenReset purge done\n");
 	d3dDriver.Uninitialize();
 	if (b_reset_world)
 		wWorld.Reset();
 	prasMainScreen->uRefs = 1;
 	destroy(&prasMainScreen);
+	dprintf("D3D9: HardScreenReset raster destroyed\n");
 	g_initDD.ReleaseAll();
 	g_initDD.BaseInit();
+	dprintf("D3D9: HardScreenReset baseinit done\n");
 
 	SetupGameScreen();
+	dprintf("D3D9: HardScreenReset SetupGameScreen done\n");
 
 	// Reset flag for future use.
 	bHardReset = false;
