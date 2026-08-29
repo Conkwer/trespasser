@@ -89,6 +89,10 @@ static void*    s_pBitsDib  = NULL;
 static int      s_iDibPitch = 0;
 static int      s_iDibWidth = 0;
 static int      s_iDibHeight = 0;
+
+// Track C: 3D-frame flag (set by the first readback of each frame) + its getter.
+static BOOL     s_b3DFrame = FALSE;
+BOOL D3D9Is3DFrame(void);
 #include "Lib/Std/PrivSelf.hpp"
 #include "Lib/Renderer/ScreenRenderAuxD3D.hpp"
 #include "Lib/W95/Direct3DCards.hpp"
@@ -1831,14 +1835,6 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 	// the software remainder + all 2D draw on top of a complete 3D frame. Called at the
 	// hardware→software transitions in CScreenRenderAuxD3D (SetD3DModePriv / EndScene).
 
-	// Set by the first readback of each frame — marks the frame as a hardware 3D frame
-	// (the loading screen / menus never readback). Reset after the Flip's present.
-	static BOOL s_b3DFrame = FALSE;
-
-	BOOL D3D9Is3DFrame(void)
-	{
-		return s_b3DFrame;
-	}
 
 	bool D3D9RasterReadback()
 	{
