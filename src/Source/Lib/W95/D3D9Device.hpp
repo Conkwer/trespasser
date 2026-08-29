@@ -49,9 +49,17 @@ private:
 	// the D3D6 pattern legal (nested/sky BeginScene collapses to the open scene).
 	bool bInScene;
 
+	// D3D6 immediate-mode vertex stream (the sky's raw Begin/Vertex/End): accumulate
+	// the vertices and draw once at End (D3D9 has no Begin/Vertex API).
+	D3DPRIMITIVETYPE pVertPrimType;
+	DWORD            dwVertFvf;
+	D3DTLVERTEX      aVerts[4096];
+	DWORD            dwVertCount;
+	bool             bVertsOpen;
+
 public:
 
-	CD3D9Device() : pDevice6(0), bInScene(false) {}
+	CD3D9Device() : pDevice6(0), bInScene(false), dwVertCount(0), bVertsOpen(false) {}
 
 	// dx6 mode: bind the real D3D6 device (called by bInitializeD3D / ReleaseD3D).
 	void BindD3D6(LPDIRECT3DDEVICE3 pDevice)
@@ -70,6 +78,46 @@ public:
 	bool bIsValid() const
 	{
 		return pDevice6 != 0;
+	}
+
+	//*****************************************************************************************
+	// D3D6 immediate-mode vertex stream (Begin/Vertex/End) — the sky draws this way.
+	HRESULT Begin(D3DPRIMITIVETYPE d3dptType, DWORD dwVertexTypeDesc, DWORD dwFlags)
+	{
+		if (pDevice6)
+			return pDevice6->Begin(d3dptType, dwVertexTypeDesc, dwFlags);
+		pVertPrimType = d3dptType;
+		dwVertFvf     = dwVertexTypeDesc;
+		dwVertCount   = 0;
+		bVertsOpen    = true;
+		return DD_OK;
+	}
+
+	//*****************************************************************************************
+	HRESULT Vertex(LPD3DTLVERTEX lpVertex)
+	{
+		if (pDevice6)
+			return pDevice6->Vertex(lpVertex);
+		if (!bVertsOpen || dwVertCount >= 4096)
+			return DDERR_GENERIC;
+		aVerts[dwVertCount++] = *lpVertex;
+		return DD_OK;
+	}
+
+	//*****************************************************************************************
+	HRESULT End(DWORD dwFlags)
+	{
+		if (pDevice6)
+			return pDevice6->End(dwFlags);
+		if (!bVertsOpen)
+			return DDERR_GENERIC;
+		bVertsOpen = false;
+		if (dwVertCount)
+		{
+			D3D9SetFVF(dwVertFvf);
+			D3D9DrawPrimitiveUP((DWORD)pVertPrimType, dwVertCount, aVerts, 32);
+		}
+		return DD_OK;
 	}
 
 	//*****************************************************************************************
