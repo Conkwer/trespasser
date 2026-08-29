@@ -1668,7 +1668,7 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 				// R2 fallback: consume any unconsumed hardware draw before the
 				// present (with the latch this is a no-op unless hardware drew
 				// after the last hw->sw transition — e.g. a late sky/water batch).
-				D3D9RasterReadback();
+				D3D9RasterReadbackFinal();
 				D3D9Present2D(s_pBitsDib, iWidthFront, iHeightFront, s_iDibPitch);
 			}
 
@@ -1851,10 +1851,29 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 		if (g_iRenderer != 2 || !s_pBitsDib)
 			return false;
 		// R2: consume-on-demand latch — only read back if hardware actually drew
-		// since the last readback. All existing call sites (EndScene/SetD3DModePriv
-		// hw->sw transitions, the FlushBatch toggles, the Flip fallback) become
-		// safe dedup points: the first one after a real draw does the work, the
-		// rest are free. Was 4 readbacks/frame (~85% of frame time) — now 1.
+		// since the last readback. The game interleaves ~40 real draw->hw->sw
+		// phases per frame with software polys drawn between them, so every
+		// transition after a draw MUST readback (the software remainder draws on
+		// top of the composited DIB) — the latch only skips the empty ones (e.g.
+		// the FlushBatch toggles, now a no-op in dx9).
+		if (!D3D9HwDrawnPeek())
+			return false;
+		if (D3D9ReadbackToDIB(s_pBitsDib, s_iDibWidth, s_iDibHeight, s_iDibPitch))
+		{
+			s_b3DFrame = TRUE;
+			D3D9HwDrawnClear();
+			return true;
+		}
+		return false;
+	}
+
+	// R2: Flip-time catch-all — any hardware draw after the last hw->sw transition
+	// (a late sky/water/batch) is composited before the present. No-op unless the
+	// draw latch is set.
+	bool D3D9RasterReadbackFinal()
+	{
+		if (g_iRenderer != 2 || !s_pBitsDib)
+			return false;
 		if (!D3D9HwDrawnPeek())
 			return false;
 		if (D3D9ReadbackToDIB(s_pBitsDib, s_iDibWidth, s_iDibHeight, s_iDibPitch))

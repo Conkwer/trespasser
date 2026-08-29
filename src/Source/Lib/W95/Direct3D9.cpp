@@ -801,12 +801,22 @@ void D3D9Present2D(const void* pSrc, int iWidth, int iHeight, int iSrcPitch)
 	s_pDevice->EndScene();
 
 	// Restore (reverse order — reverse of the quad's Set* sequence).
+	// CRITICAL (R0-fix): COLOROP/COLORARG1/ALPHAOP are restored to the D3D9
+	// DEFAULTS, NOT the snapshot. The game NEVER writes these (D3D6 texturing
+	// was TEXTUREMAPBLEND, a façade no-op) — so the only writers in the whole
+	// process are the D3D9 defaults at init and THIS quad. A snapshot restore
+	// of the first (already-leaked) present re-applies the leak forever: every
+	// draw would run SELECTARG1/TEXTURE → untextured polys (fills, terrain base)
+	// render white, textured polys lose the diffuse (unlit). Fixed defaults
+	// (MODULATE, TEXTURE x DIFFUSE) keep the D3D9 texturing semantics the D3D6
+	// driver relied on.
 	s_pDevice->SetFVF(dwFvf);
 	s_pDevice->SetSamplerState(0, D3DSAMP_MINFILTER, dwMin);
 	s_pDevice->SetSamplerState(0, D3DSAMP_MAGFILTER, dwMag);
-	s_pDevice->SetTextureStageState(0, D3DTSS_ALPHAOP,   dwAlphaOp);
-	s_pDevice->SetTextureStageState(0, D3DTSS_COLORARG1, dwColorArg);
-	s_pDevice->SetTextureStageState(0, D3DTSS_COLOROP,   dwColorOp);
+	s_pDevice->SetTextureStageState(0, D3DTSS_ALPHAOP,   D3DTOP_MODULATE);
+	s_pDevice->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+	s_pDevice->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+	s_pDevice->SetTextureStageState(0, D3DTSS_COLOROP,   D3DTOP_MODULATE);
 	s_pDevice->SetTexture(0, (IDirect3DTexture9*)pTex0);
 	if (pTex0)   // GetTexture ADDs a ref — balance it
 		((IDirect3DTexture9*)pTex0)->Release();
