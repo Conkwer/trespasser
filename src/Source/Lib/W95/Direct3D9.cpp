@@ -26,6 +26,15 @@ extern void __cdecl dprintf(char* str, ...);
 static HMODULE             s_hD3D9   = NULL;
 static IDirect3D9*         s_pD3D9   = NULL;
 static IDirect3DDevice9*   s_pDevice = NULL;
+
+// Track C diagnostics: per-frame readback count + total cost, logged once per second.
+static DWORD   s_dwReadbacksPerSec = 0;
+static DWORD   s_dwReadbackMsPerSec = 0;
+static DWORD   s_dwFramesPerSec = 0;
+static DWORD   s_dwReadbacksPerFrame = 0;
+static DWORD   s_dwReadbackMsPerFrame = 0;
+static DWORD   s_dwSeconds = 0;
+static DWORD   s_dwPrimsPerSec = 0;
 static D3DPRESENT_PARAMETERS s_pp;
 static BOOL                s_bInited = FALSE;
 
@@ -463,14 +472,6 @@ BOOL D3D9ReadbackToDIB(void* pDibBits, int iWidth, int iHeight, int iDibPitch)
 // of each frame (D3D6 clears after each flip); reset by D3D9FramePresented.
 static BOOL s_bClearedThisFrame = FALSE;
 
-// Track C diagnostics: per-frame readback count + total cost, logged once per second.
-static DWORD   s_dwReadbacksPerSec = 0;
-static DWORD   s_dwReadbackMsPerSec = 0;
-static DWORD   s_dwFramesPerSec = 0;
-static DWORD   s_dwReadbacksPerFrame = 0;
-static DWORD   s_dwReadbackMsPerFrame = 0;
-static DWORD   s_dwSeconds = 0;
-static DWORD   s_dwPrimsPerSec = 0;
 
 void D3D9FramePresented(void)
 {
