@@ -171,7 +171,12 @@ void CTPassGlobals::SetupBackground()
                                 prasMainScreen->iHeightFront,
                                 16);
 
-    pSurface->ReleaseDC(hdc);
+    // D3D9 mode: the DC belongs to the DIB raster (ReleaseDC is a no-op there);
+    // pSurface (GetPrimarySurface) is NULL by design and must not be dereferenced.
+    if (g_iRenderer == 2)
+        prasMainScreen->ReleaseDC(hdc);
+    else
+        pSurface->ReleaseDC(hdc);
 
     delete m_prasMiniBkgnd;
     m_prasMiniBkgnd = new CRasterDC(g_hwnd, 100, 75, 16);

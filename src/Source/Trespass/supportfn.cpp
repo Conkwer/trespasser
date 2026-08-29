@@ -1256,7 +1256,12 @@ void MiddleMessage(UINT uiIDS)
     SetTextColor(hdcSrc, cr);
     SetBkMode(hdcSrc, iBkMode);
 
-    hr = pSurface->ReleaseDC(hdcSrc);
+    // D3D9 mode: the DC belongs to the DIB raster (ReleaseDC is a no-op there);
+    // pSurface (GetPrimarySurface) is NULL by design and must not be dereferenced.
+    if (g_iRenderer == 2)
+        prasMainScreen->ReleaseDC(hdcSrc);
+    else
+        hr = pSurface->ReleaseDC(hdcSrc);
 }
 
 
