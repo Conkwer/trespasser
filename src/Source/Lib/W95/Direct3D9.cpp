@@ -329,6 +329,7 @@ BOOL D3D9DrawPrimitiveUP(DWORD dwPrimType, DWORD dwVertexCount, const void* pVer
 	// D3D6 DrawPrimitive takes a VERTEX count; D3D9 DrawPrimitiveUP needs a PRIMITIVE
 	// count. Passing the vertex count reads past the buffer → garbage vertices that
 	// explode across the screen (the stretched-spike tearing seen on the host).
+	s_dwPrimsPerSec += dwVertexCount;
 	DWORD dwPrimCount = dwVertexCount;
 	switch (dwPrimType)
 	{
@@ -413,6 +414,12 @@ BOOL D3D9ReadbackToDIB(void* pDibBits, int iWidth, int iHeight, int iDibPitch)
 	if (!s_pDevice || !pDibBits)
 		return FALSE;
 
+	// Track C diagnostics: measure the readback cost.
+	LARGE_INTEGER liFreq, liStart, liEnd;
+	QueryPerformanceFrequency(&liFreq);
+	QueryPerformanceCounter(&liStart);
+	s_dwReadbacksPerFrame++;
+
 	// Lazy-create the staging surface at the backbuffer size.
 	IDirect3DSurface9* pb = NULL;
 	if (FAILED(s_pDevice->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &pb)))
@@ -445,6 +452,10 @@ BOOL D3D9ReadbackToDIB(void* pDibBits, int iWidth, int iHeight, int iDibPitch)
 		return FALSE;
 	Convert8888To565(lr.pBits, pDibBits, iWidth, iHeight, (int)lr.Pitch, iDibPitch);
 	s_pReadback->UnlockRect();
+
+	QueryPerformanceCounter(&liEnd);
+	s_dwReadbacksPerSec++;
+	s_dwReadbackMsPerSec += DWORD((liEnd.QuadPart - liStart.QuadPart) * 1000 / liFreq.QuadPart);
 	return TRUE;
 }
 
@@ -452,8 +463,35 @@ BOOL D3D9ReadbackToDIB(void* pDibBits, int iWidth, int iHeight, int iDibPitch)
 // of each frame (D3D6 clears after each flip); reset by D3D9FramePresented.
 static BOOL s_bClearedThisFrame = FALSE;
 
+// Track C diagnostics: per-frame readback count + total cost, logged once per second.
+static DWORD   s_dwReadbacksPerSec = 0;
+static DWORD   s_dwReadbackMsPerSec = 0;
+static DWORD   s_dwFramesPerSec = 0;
+static DWORD   s_dwReadbacksPerFrame = 0;
+static DWORD   s_dwReadbackMsPerFrame = 0;
+static DWORD   s_dwSeconds = 0;
+static DWORD   s_dwPrimsPerSec = 0;
+
 void D3D9FramePresented(void)
 {
+	if (s_pDevice)
+	{
+		s_dwFramesPerSec++;
+		if (++s_dwSeconds >= 60)
+		{
+			s_dwSeconds = 0;
+			dprintf("D3D9: perf frames=%u prims=%u readbacks=%u (%.2f/frame) readbackMs=%u (%.2f/frame)\n",
+				s_dwFramesPerSec, s_dwPrimsPerSec, s_dwReadbacksPerSec,
+				s_dwFramesPerSec ? double(s_dwReadbacksPerSec) / s_dwFramesPerSec : 0.0,
+				s_dwReadbackMsPerSec,
+				s_dwFramesPerSec ? double(s_dwReadbackMsPerSec) / s_dwFramesPerSec : 0.0);
+			s_dwFramesPerSec = 0;
+			s_dwReadbacksPerSec = 0;
+			s_dwReadbackMsPerSec = 0;
+			s_dwPrimsPerSec = 0;
+		}
+		s_dwReadbacksPerFrame = 0;
+	}
 	s_bClearedThisFrame = FALSE;
 }
 
