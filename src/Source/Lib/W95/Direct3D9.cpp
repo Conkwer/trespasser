@@ -325,10 +325,25 @@ BOOL D3D9DrawPrimitiveUP(DWORD dwPrimType, DWORD dwVertexCount, const void* pVer
 {
 	if (!s_pDevice || !pVerts)
 		return FALSE;
+
+	// D3D6 DrawPrimitive takes a VERTEX count; D3D9 DrawPrimitiveUP needs a PRIMITIVE
+	// count. Passing the vertex count reads past the buffer → garbage vertices that
+	// explode across the screen (the stretched-spike tearing seen on the host).
+	DWORD dwPrimCount = dwVertexCount;
+	switch (dwPrimType)
+	{
+		case D3DPT_TRIANGLELIST: dwPrimCount = dwVertexCount / 3;    break;
+		case D3DPT_TRIANGLESTRIP:
+		case D3DPT_TRIANGLEFAN:  dwPrimCount = dwVertexCount - 2;   break;
+		case D3DPT_LINELIST:     dwPrimCount = dwVertexCount / 2;   break;
+		case D3DPT_LINESTRIP:    dwPrimCount = dwVertexCount - 1;   break;
+		default:                 dwPrimCount = dwVertexCount;       break;
+	}
+
 	if (s_dwFVF)
 		s_pDevice->SetFVF(s_dwFVF);
 	return SUCCEEDED(s_pDevice->DrawPrimitiveUP((D3DPRIMITIVETYPE)dwPrimType,
-		dwVertexCount, pVerts, dwStride));
+		dwPrimCount, pVerts, dwStride));
 }
 
 void* D3D9CreateTexture(int iWidth, int iHeight, DWORD dwFormat)
