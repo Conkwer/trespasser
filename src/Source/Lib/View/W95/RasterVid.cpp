@@ -1663,10 +1663,11 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 				D3D9Present2D(s_pBitsDib, iWidthFront, iHeightFront, s_iDibPitch);
 
 			// Trespasser-Plus debug helper: periodic screenshot dumps. Only on 3D
-			// hardware frames — the loading screen / menus are 2D presents and would
-			// otherwise fill the dump with the progress dialog.
-			if (g_bScreenshot && D3D9IsHardwareFrame())
+			// hardware frames (marked by the readback) — the loading screen / menus
+			// are 2D presents and would otherwise fill the dump with the dialog.
+			if (g_bScreenshot && D3D9Is3DFrame())
 				DumpScreenshot();
+			s_b3DFrame = FALSE;
 			return;
 		}
 
@@ -1829,11 +1830,26 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 	// Track C: copy the D3D9 backbuffer (the hardware 3D frame) into the DIB raster so
 	// the software remainder + all 2D draw on top of a complete 3D frame. Called at the
 	// hardware→software transitions in CScreenRenderAuxD3D (SetD3DModePriv / EndScene).
+
+	// Set by the first readback of each frame — marks the frame as a hardware 3D frame
+	// (the loading screen / menus never readback). Reset after the Flip's present.
+	static BOOL s_b3DFrame = FALSE;
+
+	BOOL D3D9Is3DFrame(void)
+	{
+		return s_b3DFrame;
+	}
+
 	bool D3D9RasterReadback()
 	{
 		if (g_iRenderer != 2 || !s_pBitsDib)
 			return false;
-		return D3D9ReadbackToDIB(s_pBitsDib, s_iDibWidth, s_iDibHeight, s_iDibPitch);
+		if (D3D9ReadbackToDIB(s_pBitsDib, s_iDibWidth, s_iDibHeight, s_iDibPitch))
+		{
+			s_b3DFrame = TRUE;
+			return true;
+		}
+		return false;
 	}
 
 	//******************************************************************************************
