@@ -163,6 +163,14 @@ public:
 		const DWORD s = (DWORD)d3dRenderStateType;
 		if (D3D9DEV_NOOP_STATE(s))
 			return DD_OK;
+
+		// D3D9: the game's specular = the D3D6 specular-fog colour (fog colour + level in
+		// the alpha). D3D9 has no specular-alpha fog, and SPECULARENABLE ADDS that RGB to
+		// every pixel → the world white-outs. Force it off until the fog gets a proper
+		// D3D9 recipe (fog baked into the vertex diffuse).
+		if (s == 29 /* D3DRENDERSTATE_SPECULARENABLE */)
+			dwValue = FALSE;
+
 		D3D9SetRenderState(s, dwValue);
 		return DD_OK;
 	}
