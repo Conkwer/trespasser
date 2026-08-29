@@ -337,8 +337,14 @@ private:
 		s_pBitsDib = NULL;
 
 		// 16bpp 565 top-down DIB (row 0 at the start of the bits — matches the
-		// game's linear row-first drawing).
-		BITMAPINFO bi;
+		// game's linear row-first drawing). BI_BITFIELDS needs the 3 masks — use a
+		// struct that actually holds them (writing them into BITMAPINFO's single
+		// bmiColors[1] would overflow the stack copy).
+		struct
+		{
+			BITMAPINFOHEADER bmiHeader;
+			DWORD            aMasks[3];
+		} bi;
 		ZeroMemory(&bi, sizeof(bi));
 		bi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
 		bi.bmiHeader.biWidth       = i_width;
@@ -346,12 +352,12 @@ private:
 		bi.bmiHeader.biPlanes      = 1;
 		bi.bmiHeader.biBitCount    = 16;
 		bi.bmiHeader.biCompression = BI_BITFIELDS;
-		((DWORD*)bi.bmiColors)[0] = 0xF800;
-		((DWORD*)bi.bmiColors)[1] = 0x07E0;
-		((DWORD*)bi.bmiColors)[2] = 0x001F;
+		bi.aMasks[0] = 0xF800;
+		bi.aMasks[1] = 0x07E0;
+		bi.aMasks[2] = 0x001F;
 
 		s_hdcDib = CreateCompatibleDC(NULL);
-		s_hbmDib = CreateDIBSection(NULL, &bi, DIB_RGB_COLORS, &s_pBitsDib, NULL, 0);
+		s_hbmDib = CreateDIBSection(NULL, (BITMAPINFO*)&bi, DIB_RGB_COLORS, &s_pBitsDib, NULL, 0);
 		if (!s_hdcDib || !s_hbmDib || !s_pBitsDib)
 		{
 			dprintf("D3D9: bConstructD3D9SysRam DIB FAILED (%dx%d)\n", i_width, i_height);
