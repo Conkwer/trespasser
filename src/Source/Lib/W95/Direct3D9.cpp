@@ -308,6 +308,11 @@ void D3D9SetRenderState(DWORD dwState, DWORD dwValue)
 {
 	if (dwState == 34 /* D3DRS_FOGCOLOR */)
 		s_dwFogColour = dwValue;
+	// The game's D3D6-era ALPHAREF is 16-bit (the game sets 0x1000); D3D9's is
+	// 0..255. Passing 0x1000 raw masks to 0 or clamps to 255, which culls every
+	// zero-alpha (transparent) texel — the water/ocean was vanishing entirely.
+	if (dwState == 24 /* D3DRS_ALPHAREF */)
+		dwValue >>= 8;
 	if (s_pDevice)
 		s_pDevice->SetRenderState((D3DRENDERSTATETYPE)dwState, dwValue);
 }

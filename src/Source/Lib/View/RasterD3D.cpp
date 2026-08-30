@@ -829,6 +829,16 @@ public:
 			if (!bLocked)
 				return;
 			--iLockCount;
+			// One-shot diag: sample the CPU-side written content BEFORE the UnlockRect
+			// (no re-lock needed — the pSurface is the game's own locked pointer).
+			static int s_iUnlockContentDiag = 0;
+			if (s_iUnlockContentDiag < 8 && pSurface && iLinePixels > 0)
+			{
+				const WORD* pw = (const WORD*)pSurface;
+				dprintf("D3D9: unlock content #%d tex=%p pitchpx=%d px=%04x %04x %04x %04x\n",
+					s_iUnlockContentDiag, (void*)pd3dtexTex, iLinePixels, pw[0], pw[1], pw[2], pw[3]);
+				++s_iUnlockContentDiag;
+			}
 			if (pd3dtexTex)
 				D3D9UnlockTexture(pd3dtexTex);
 			bLocked = false;
