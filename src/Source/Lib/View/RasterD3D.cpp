@@ -776,11 +776,21 @@ public:
 			void* pBits;
 			int   iPitch;
 			if (!pd3dtexTex || !D3D9LockTexture(pd3dtexTex, &pBits, &iPitch))
+			{
+				// One-shot diag: a Lock that fails to reach the D3D9 texture.
+				static int s_iLockFailDiag = 0;
+				if (s_iLockFailDiag++ < 8)
+					dprintf("D3D9: CRasterD3D::Lock FAILED tex=%p\n", (void*)pd3dtexTex);
 				return;
+			}
 			++iLockCount;
 			pSurface    = pBits;
 			iLinePixels = iPitch / 2;
 			bLocked     = true;
+			// One-shot diag: the first few locks reach the twin.
+			static int s_iLockDiag = 0;
+			if (s_iLockDiag++ < 8)
+				dprintf("D3D9: CRasterD3D::Lock ok tex=%p pitch=%d\n", (void*)pd3dtexTex, iPitch);
 			return;
 		}
 

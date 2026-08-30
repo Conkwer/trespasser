@@ -338,8 +338,13 @@ public:
 			return;
 		}
 
-		// Get the texture interface.
+		// Get the texture interface. For a sub-raster (region of a page) the raster
+		// itself has no D3D texture — follow the prasLink to the page's twin, which
+		// is what the D3D9 façade binds (the texture coords are page-relative, as in
+		// the D3D6 path).
 		LPDIRECT3DTEXTURE2 pd3dtex = (LPDIRECT3DTEXTURE2)pras->pd3dtexGet();
+		if (!pd3dtex && pras->prasLink)
+			pd3dtex = (LPDIRECT3DTEXTURE2)pras->prasLink->pd3dtexGet();
 		AlwaysAssert(pd3dtex);
 
 		// Do not apply the texture interface if it does matches the current one.

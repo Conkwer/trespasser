@@ -266,7 +266,7 @@ void RasterizeOpaque(CMArray<CRenderPolygon*>& appoly)
 				// Copy the data to the TLVertex.
 				ptlv->sx       = prv->v3Screen.tX + CScreenRenderAuxD3D::fOffsetX;
 				ptlv->sy       = prv->v3Screen.tY + CScreenRenderAuxD3D::fOffsetY;
-				ptlv->sz       = fGetScreenZ(prv);
+				ptlv->sz       = fGetScreenZ(prv) * fZBias;
 				ptlv->rhw      = prv->v3Screen.tZ;
 				ptlv->color    = d3dt.u4Colour;
 				ptlv->tu       = prv->tcTex.tX;
@@ -305,7 +305,7 @@ void RasterizeOpaque(CMArray<CRenderPolygon*>& appoly)
 				// Copy the data to the TLVertex.
 				ptlv->sx       = prv->v3Screen.tX + CScreenRenderAuxD3D::fOffsetX;
 				ptlv->sy       = prv->v3Screen.tY + CScreenRenderAuxD3D::fOffsetY;
-				ptlv->sz       = fGetScreenZ(prv);
+				ptlv->sz       = fGetScreenZ(prv) * fZBias;
 				ptlv->rhw      = prv->v3Screen.tZ;
 				ptlv->color    = d3dt.u4Colour;
 				ptlv->tu       = prv->tcTex.tX;
@@ -336,7 +336,7 @@ void RasterizeOpaque(CMArray<CRenderPolygon*>& appoly)
 				// Copy the data to the TLVertex.
 				ptlv->sx       = prv->v3Screen.tX + CScreenRenderAuxD3D::fOffsetX;
 				ptlv->sy       = prv->v3Screen.tY + CScreenRenderAuxD3D::fOffsetY;
-				ptlv->sz       = fGetScreenZ(prv);
+				ptlv->sz       = fGetScreenZ(prv) * fZBias;
 				ptlv->rhw      = prv->v3Screen.tZ;
 				ptlv->color    = d3drgbPlain;
 				ptlv->specular = d3d_fog;
@@ -422,7 +422,7 @@ void RasterizeFill(CMArray<CRenderPolygon*>& appoly)
 			// Copy the data to the TLVertex.
 			ptlv->sx       = prv->v3Screen.tX + CScreenRenderAuxD3D::fOffsetX;
 			ptlv->sy       = prv->v3Screen.tY + CScreenRenderAuxD3D::fOffsetY;
-			ptlv->sz       = fGetScreenZ(prv);
+			ptlv->sz       = fGetScreenZ(prv) * fZBias;
 			ptlv->rhw      = prv->v3Screen.tZ;
 			ptlv->color    = d3dcol;
 			ptlv->tu       = prv->tcTex.tX;
@@ -476,7 +476,7 @@ void RasterizeFluid(CMArray<CRenderPolygon*>& appoly)
 
 		// Set the first vertex.
 		SRenderVertex* prv = prp->paprvPolyVertices[0];
-		atlvBuffer[0].sz       = fGetScreenZ(prv);
+		atlvBuffer[0].sz       = fGetScreenZ(prv) * fZBias;
 		atlvBuffer[0].rhw      = prv->v3Screen.tZ;
 		atlvBuffer[0].color    = (d3dcol & 0x00FFFFFF) | d3dcolFluidAlpha;
 		atlvBuffer[0].specular = d3d_fog;
@@ -657,7 +657,7 @@ void RasterizeCacheBatch(CPArray<CRenderPolygon>& parpoly)
 			// Copy the data to the TLVertex.
 			ptlv->sx       = prv->v3Screen.tX + CScreenRenderAuxD3D::fOffsetX;
 			ptlv->sy       = prv->v3Screen.tY + CScreenRenderAuxD3D::fOffsetY;
-			ptlv->sz       = fGetScreenZ(prv);
+			ptlv->sz       = fGetScreenZ(prv) * fZBias;
 			ptlv->rhw      = prv->v3Screen.tZ;
 			ptlv->color    = d3drgbPlain;
 			ptlv->tu       = prv->tcTex.tX;
@@ -747,7 +747,7 @@ void RasterizeTerrainBatch(CPArray<CRenderPolygon>& parpoly)
 			// Copy the data to the TLVertex.
 			ptlv->sx       = prv->v3Screen.tX + CScreenRenderAuxD3D::fOffsetX;
 			ptlv->sy       = prv->v3Screen.tY + CScreenRenderAuxD3D::fOffsetY;
-			ptlv->sz       = fGetScreenZ(prv);
+			ptlv->sz       = fGetScreenZ(prv) * fZBias;
 			ptlv->rhw      = prv->v3Screen.tZ;
 			ptlv->color    = d3drgbPlain;
 			ptlv->specular = d3d_fog;

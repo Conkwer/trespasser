@@ -73,10 +73,17 @@ class CPage : public CPackedRaster
 
 	// Construct D3D raster.
 	CPage(int i_size, ED3DTextureType ed3d)
-		: CPackedRaster(((const IDirectDraw4*)DirectDraw::pdd4 != NULL) ? rptr_cast(CRaster, rptr_new CRasterD3D(CRasterD3D::CInitPage(i_size, i_size, ed3d))) :
-		                                   rptr_cast(CRaster, rptr_new CRasterMem(i_size, i_size, 16, i_size * 2, &prasMainScreen->pxf))),
+		: CPackedRaster(
+			(DirectDraw::pdd4 != NULL || g_iRenderer == 2)
+				? rptr_cast(CRaster, rptr_new CRasterD3D(CRasterD3D::CInitPage(i_size, i_size, ed3d)))
+				: rptr_cast(CRaster, rptr_new CRasterMem(i_size, i_size, 16, i_size * 2, &prasMainScreen->pxf))),
 		  bModified(true)
 	{
+		// One-shot diag: confirm the page raster type (white-terrain hunt).
+		static int s_iPageDiag = 0;
+		if (s_iPageDiag++ < 8)
+			dprintf("D3D9: page ctor #%d size=%d type=%s\n", s_iPageDiag, i_size,
+				(DirectDraw::pdd4 != NULL || g_iRenderer == 2) ? "CRasterD3D" : "CRasterMem");
 	}
 
 	// Construct mem raster.
@@ -259,6 +266,10 @@ class CPage : public CPackedRaster
 		// Set the page type.
 		this_d->ed3dTextureType = ed3d;
 
+		// One-shot diag: does the D3D page path get selected?
+		static int s_iDiag = 0;
+		if (s_iDiag++ < 2)
+			dprintf("D3D9: AllocPagesD3D mem=%d max=%d bUseD3D=%d\n", i_mem_size, i_max_page_size, (int)d3dDriver.bUseD3D());
 		AllocPages(i_mem_size, i_page_size_range, f_page_count_factor, i_max_page_size, d3dDriver.bUseD3D());
 	}
 

@@ -641,6 +641,10 @@ namespace NMultiResolution
 	//******************************************************************************************
 	void CTextureNode::SetTextureMemSize(int i_mem_size_kb)
 	{
+		// One-shot diag: is the terrain texture memory setup reached at all?
+		static int s_iDiag = 0;
+		if (s_iDiag++ < 2)
+			dprintf("D3D9: SetTextureMemSize kb=%d bUseD3D=%d\n", i_mem_size_kb, (int)d3dDriver.bUseD3D());
 	#if bTRACK_D3D_RASTERS
 		TrackSystem(etrTerrain);
 	#endif

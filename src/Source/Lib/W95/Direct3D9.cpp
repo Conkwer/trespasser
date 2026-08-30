@@ -364,10 +364,41 @@ void D3D9SetSamplerState(DWORD dwStage, DWORD dwSamp, DWORD dwValue)
 		s_pDevice->SetSamplerState(dwStage, (D3DSAMPLERSTATETYPE)dwSamp, dwValue);
 }
 
+// One-shot bind diagnostics: sample the first few textures bound to stage 0 —
+// are the batch/linked copies white/empty, or is the content fine and the draw broken?
+static int s_iBindDiag = 0;
+static void D3D9BindDiag(void* pTex)
+{
+	if (s_iBindDiag >= 8 || !pTex)
+		return;
+	IDirect3DTexture9* pt = (IDirect3DTexture9*)pTex;
+	D3DLOCKED_RECT lr;
+	if (FAILED(pt->LockRect(0, &lr, NULL, 0)))
+	{
+		char sz[96];
+		wsprintf(sz, "D3D9: bind diag #%d tex=%p LockRect FAILED", s_iBindDiag, pTex);
+		D3D9Log(sz);
+		++s_iBindDiag;
+		return;
+	}
+	const WORD* pw = (const WORD*)lr.pBits;
+	DWORD dwPitchPx = (DWORD)lr.Pitch / 2;
+	char sz[160];
+	wsprintf(sz, "D3D9: bind diag #%d tex=%p pitch=%d px=%04x %04x %04x %04x",
+		s_iBindDiag, pTex, (int)lr.Pitch, pw[0], pw[1], pw[2], pw[3]);
+	D3D9Log(sz);
+	pt->UnlockRect(0);
+	++s_iBindDiag;
+}
+
 void D3D9SetTexture(DWORD dwStage, void* pTex)
 {
 	if (s_pDevice)
+	{
+		if (dwStage == 0)
+			D3D9BindDiag(pTex);
 		s_pDevice->SetTexture(dwStage, (IDirect3DTexture9*)pTex);
+	}
 }
 
 static DWORD s_dwFVF = 0;
@@ -445,8 +476,11 @@ static void D3D9UnlockTextureDiag(IDirect3DTexture9* pt)
 	if (s_iUnlockDiagCount >= 8)
 		return;
 	D3DLOCKED_RECT lr;
-	if (FAILED(pt->LockRect(0, &lr, NULL, D3DLOCK_READONLY)))
+	if (FAILED(pt->LockRect(0, &lr, NULL, 0)))
+	{
+		D3D9Log("D3D9: unlock diag re-lock FAILED");
 		return;
+	}
 	const WORD* pw = (const WORD*)lr.pBits;
 	DWORD dwPitchPx = (DWORD)lr.Pitch / 2;
 	DWORD dwLine0 = pw[0] | (pw[1] << 16);
@@ -616,7 +650,8 @@ void D3D9FramePresented(void)
 		s_dwFramesPerSec++;
 		if (++s_dwSeconds >= 60)
 		{
-			D3D9StateDump();   // once, at the first perf window (after ~60 frames)
+			if (s_dwPrimsPerSec > 0)
+				D3D9StateDump();   // at the first perf window that drew 3D (the level), not the menu
 			DWORD dwNow = GetTickCount();
 			static DWORD s_dwLastLog = 0;
 			DWORD dwElapsed = dwNow - s_dwLastLog;
