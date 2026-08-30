@@ -1579,6 +1579,11 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 		static DWORD s_dwLastShot = 0;
 		static int   s_iShotNum = 0;
 
+		// Cap at 5 dumps — if the game process isn't killed, an unbounded timer
+		// would fill the disk with 900KB BMPs every ScreenshotTimeout seconds.
+		if (s_iShotNum >= 5)
+			return;
+
 		DWORD dwNow = GetTickCount();
 		if (dwNow - s_dwLastShot < DWORD(g_iScreenshotTimeout * 1000))
 			return;

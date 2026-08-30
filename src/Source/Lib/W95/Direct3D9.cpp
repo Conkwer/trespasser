@@ -436,10 +436,37 @@ BOOL D3D9LockTexture(void* pTex, void** ppBits, int* piPitch)
 	return TRUE;
 }
 
+// One-shot texture-content diagnostics: after the first few unlocks, sample the
+// locked region's pixels to confirm the CPU-side upload actually wrote the 565
+// data (the white-terrain hunt — are the page textures empty/white?).
+static int s_iUnlockDiagCount = 0;
+static void D3D9UnlockTextureDiag(IDirect3DTexture9* pt)
+{
+	if (s_iUnlockDiagCount >= 8)
+		return;
+	D3DLOCKED_RECT lr;
+	if (FAILED(pt->LockRect(0, &lr, NULL, D3DLOCK_READONLY)))
+		return;
+	const WORD* pw = (const WORD*)lr.pBits;
+	DWORD dwPitchPx = (DWORD)lr.Pitch / 2;
+	DWORD dwLine0 = pw[0] | (pw[1] << 16);
+	DWORD dwLine1 = (dwPitchPx ? pw[dwPitchPx] : 0) | (dwPitchPx ? (pw[dwPitchPx + 1] << 16) : 0);
+	char sz[128];
+	wsprintf(sz, "D3D9: unlock diag #%d tex=%p pitch=%d px[0..1]=%04x %04x px[pitch..]=%04x %04x",
+		s_iUnlockDiagCount, (void*)pt, (int)lr.Pitch, pw[0], pw[1],
+		dwPitchPx ? pw[dwPitchPx] : 0, dwPitchPx ? pw[dwPitchPx + 1] : 0);
+	D3D9Log(sz);
+	pt->UnlockRect(0);
+	++s_iUnlockDiagCount;
+}
+
 void D3D9UnlockTexture(void* pTex)
 {
 	if (pTex)
+	{
+		D3D9UnlockTextureDiag((IDirect3DTexture9*)pTex);
 		((IDirect3DTexture9*)pTex)->UnlockRect(0);
+	}
 }
 
 void D3D9ReleaseTexture(void* pTex)
@@ -529,6 +556,59 @@ BOOL D3D9ReadbackToDIB(void* pDibBits, int iWidth, int iHeight, int iDibPitch)
 static BOOL s_bClearedThisFrame = FALSE;
 
 
+// One-shot device-state dump (the white-terrain hunt): log the stage-0 TSS,
+// sampler + key render states + the bound texture's first pixels at the first
+// 3D frame present. Tells us whether the device state is sane and whether the
+// bound texture content is white/empty.
+static BOOL s_bStateDumpDone = FALSE;
+static void D3D9StateDump(void)
+{
+	if (s_bStateDumpDone || !s_pDevice)
+		return;
+	s_bStateDumpDone = TRUE;
+	char sz[512];
+	wsprintf(sz,
+		"D3D9: state dump — COLOROP=%lu COLORARG1=%lu COLORARG2=%lu ALPHAOP=%lu "
+		"ALPHAARG1=%lu ALPHAARG2=%lu | ZEN=%lu ZFUNC=%lu ZWRITE=%lu CULL=%lu "
+		"ALPHABLEND=%lu SRC=%lu DST=%lu | FOGEN=%lu FOGCOL=0x%08lx SPEC=%lu | "
+		"MAG=%lu MIN=%lu MIP=%lu ADDRU=%lu ADDRV=%lu FVF=0x%lx",
+		D3D9GetTextureStageState(0, D3DTSS_COLOROP), D3D9GetTextureStageState(0, D3DTSS_COLORARG1),
+		D3D9GetTextureStageState(0, D3DTSS_COLORARG2), D3D9GetTextureStageState(0, D3DTSS_ALPHAOP),
+		D3D9GetTextureStageState(0, D3DTSS_ALPHAARG1), D3D9GetTextureStageState(0, D3DTSS_ALPHAARG2),
+		D3D9GetRenderState(D3DRS_ZENABLE), D3D9GetRenderState(D3DRS_ZFUNC), D3D9GetRenderState(D3DRS_ZWRITEENABLE),
+		D3D9GetRenderState(D3DRS_CULLMODE), D3D9GetRenderState(D3DRS_ALPHABLENDENABLE),
+		D3D9GetRenderState(D3DRS_SRCBLEND), D3D9GetRenderState(D3DRS_DESTBLEND),
+		D3D9GetRenderState(D3DRS_FOGENABLE), (unsigned long)s_dwFogColour, D3D9GetRenderState(D3DRS_SPECULARENABLE),
+		D3D9GetSamplerState(0, D3DSAMP_MAGFILTER), D3D9GetSamplerState(0, D3DSAMP_MINFILTER),
+		D3D9GetSamplerState(0, D3DSAMP_MIPFILTER), D3D9GetSamplerState(0, D3DSAMP_ADDRESSU),
+		D3D9GetSamplerState(0, D3DSAMP_ADDRESSV), D3D9GetFVF());
+	D3D9Log(sz);
+
+	// Sample the current bound texture (texture0) content.
+	IDirect3DTexture9* pt = (IDirect3DTexture9*)D3D9GetTexture(0);
+	if (!pt)
+	{
+		D3D9Log("D3D9: state dump — texture0 = NULL");
+		return;
+	}
+	D3DLOCKED_RECT lr;
+	if (FAILED(pt->LockRect(0, &lr, NULL, D3DLOCK_READONLY)))
+	{
+		D3D9Log("D3D9: state dump — texture0 LockRect failed");
+		((IDirect3DTexture9*)pt)->Release();
+		return;
+	}
+	const WORD* pw = (const WORD*)lr.pBits;
+	DWORD dwPitchPx = (DWORD)lr.Pitch / 2;
+	char sz2[256];
+	wsprintf(sz2, "D3D9: state dump — tex0=%p pitch=%d first px=%04x %04x %04x %04x row[pitch]=%04x",
+		(void*)pt, (int)lr.Pitch, pw[0], pw[1], pw[2], pw[3],
+		dwPitchPx ? pw[dwPitchPx] : 0);
+	D3D9Log(sz2);
+	pt->UnlockRect(0);
+	((IDirect3DTexture9*)pt)->Release();
+}
+
 void D3D9FramePresented(void)
 {
 	if (s_pDevice)
@@ -536,6 +616,7 @@ void D3D9FramePresented(void)
 		s_dwFramesPerSec++;
 		if (++s_dwSeconds >= 60)
 		{
+			D3D9StateDump();   // once, at the first perf window (after ~60 frames)
 			DWORD dwNow = GetTickCount();
 			static DWORD s_dwLastLog = 0;
 			DWORD dwElapsed = dwNow - s_dwLastLog;
