@@ -640,7 +640,7 @@ void CMainWnd::GameLoop()
 	BOOL b_autoload = bGetAutoLoad();
 	SetAutoLoad(FALSE);
 
-	if (!b_autoload && !m_bRelaunch)
+	if (!b_autoload && !m_bRelaunch && !g_szAutoloadLevel[0])
 	{
 		CopyrightScreen();
         DWIPresents();

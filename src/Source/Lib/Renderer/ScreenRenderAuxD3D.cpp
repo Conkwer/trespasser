@@ -1822,6 +1822,23 @@ public:
 		Assert(d3dDriver.pGetDevice());
 		Assert(ed3drMode == ed3drHARDWARE_LOCK);
 
+		// Water diagnostic (one-shot, first N water polys): does the water texture
+		// actually have a D3D9 texture twin? If rasd3d and linkd3d are both 0 the
+		// raster is a CPU-only CRasterMem, so SetTexture binds NULL -> MODULATE passes
+		// the WHITE diffuse (d3drgbPlain) straight through -> the ocean renders white.
+		static int s_waterDiag = 0;
+		if (s_waterDiag < 6)
+		{
+			CRaster* pras = rp.ptexTexture->prasGetTexture(0).ptGet();
+			CRaster* prasLink = pras ? pras->prasLink.ptGet() : 0;
+			dprintf("D3D9 WATER[%d]: tex=%08x pixC=%08x ras=%08x rasd3d=%08x link=%08x linkd3d=%08x nv=%u mip=%d\n",
+				s_waterDiag, (unsigned)rp.ptexTexture.ptGet(), (unsigned)rp.ptexTexture->d3dpixColour,
+				(unsigned)pras, pras ? (unsigned)pras->pd3dtexGet() : 0,
+				(unsigned)prasLink, prasLink ? (unsigned)prasLink->pd3dtexGet() : 0,
+				(unsigned)rp.paprvPolyVertices.uLen, (int)rp.iMipLevel);
+			s_waterDiag++;
+		}
+
 		// Necessary states.
 		d3dstState.SetAddressing(rp.eamAddressMode);
 		d3dstState.SetSpecular();

@@ -510,6 +510,41 @@ int DoWinMain(HINSTANCE hInstance,
 	}
 
     OpenKey();
+
+	// Trespasser-Plus: command-line autoload override.
+	//   trespass.exe -level be.scn   (or /level, --level)
+	//   trespass.exe -autoload be.scn
+	// Overrides the Autoload=<code> INI key so a specific level can be pushed for
+	// testing without editing the config. Setting g_szAutoloadLevel (here or via the
+	// INI) also makes GameLoop SKIP the intro video and load the level directly.
+	{
+		char* pszCmd = lpCmdLine;
+		while (*pszCmd)
+		{
+			while (*pszCmd == ' ' || *pszCmd == '\t') pszCmd++;
+			if (!*pszCmd) break;
+			if (pszCmd[0] == '-' || pszCmd[0] == '/')
+			{
+				int nDash = (pszCmd[1] == '-') ? 2 : 1;
+				if (_strnicmp(pszCmd + nDash, "level", 5) == 0 ||
+					_strnicmp(pszCmd + nDash, "autoload", 8) == 0)
+				{
+					pszCmd += nDash + ((_strnicmp(pszCmd + nDash, "level", 5) == 0) ? 5 : 8);
+					while (*pszCmd == ' ' || *pszCmd == '\t' || *pszCmd == ':' || *pszCmd == '=') pszCmd++;
+					if (*pszCmd && *pszCmd != '-' && *pszCmd != '/')
+					{
+						int k = 0;
+						while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t' && k < (int)sizeof(g_szAutoloadLevel)-1)
+							g_szAutoloadLevel[k++] = *pszCmd++;
+						g_szAutoloadLevel[k] = '\0';
+						dprintf("Trespasser-Plus: -level %s\n", g_szAutoloadLevel);
+					}
+				}
+			}
+			while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t') pszCmd++;
+		}
+	}
+
 	if (bMustSetNVidiaRegistry())
 		SetNVidiaRegistry();
 
