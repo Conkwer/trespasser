@@ -540,6 +540,31 @@ int DoWinMain(HINSTANCE hInstance,
 						dprintf("Trespasser-Plus: -level %s\n", g_szAutoloadLevel);
 					}
 				}
+				else if (_strnicmp(pszCmd + nDash, "teleport", 8) == 0)
+				{
+					// -teleport <x>,<y>,<z>  (also space-separated). Fire PlayerTeleportToXYZ
+					// on the first game frame (gamewnd.cpp InnerLoopCall). Allows leading '-'.
+					pszCmd += nDash + 8;
+					float fv[3] = { 0, 0, 0 };
+					int nGot = 0;
+					for (int n = 0; n < 3 && *pszCmd; n++)
+					{
+						while (*pszCmd == ' ' || *pszCmd == '\t' || *pszCmd == ',' || *pszCmd == ':' || *pszCmd == '=') pszCmd++;
+						if (!*pszCmd) break;
+						char* pEnd = NULL;
+						fv[n] = (float)strtod(pszCmd, &pEnd);
+						if (pEnd == pszCmd) break;
+						nGot++;
+						while (*pEnd && *pEnd != ' ' && *pEnd != '\t' && *pEnd != ',') pEnd++;
+						pszCmd = pEnd;
+					}
+					if (nGot >= 3)
+					{
+						g_bTeleport = true;
+						g_fTeleportX = fv[0]; g_fTeleportY = fv[1]; g_fTeleportZ = fv[2];
+						dprintf("Trespasser-Plus: -teleport %.3f, %.3f, %.3f\n", fv[0], fv[1], fv[2]);
+					}
+				}
 			}
 			while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t') pszCmd++;
 		}

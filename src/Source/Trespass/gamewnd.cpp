@@ -753,6 +753,22 @@ void CGameWnd::InnerLoopCall()
         return;
     }
 
+    // CLI:-teleport <x>,<y>,<z> — fire once the sim is up (the player exists here).
+    {
+        extern bool g_bTeleport;
+        extern float g_fTeleportX, g_fTeleportY, g_fTeleportZ;
+        if (g_bTeleport)
+        {
+            g_bTeleport = false;
+            extern void PlayerTeleportToXYZ(float, float, float);
+            dprintf("CLI teleport: before (%.1f, %.1f, %.1f)\n",
+                gpPlayer->v3Pos().tX, gpPlayer->v3Pos().tY, gpPlayer->v3Pos().tZ);
+            PlayerTeleportToXYZ(g_fTeleportX, g_fTeleportY, g_fTeleportZ);
+            dprintf("CLI teleport: after (%.1f, %.1f, %.1f)\n",
+                gpPlayer->v3Pos().tX, gpPlayer->v3Pos().tY, gpPlayer->v3Pos().tZ);
+        }
+    }
+
     if (gpPlayer->bDead())
     {
         m_iNoticedDead++;

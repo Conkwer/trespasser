@@ -177,6 +177,8 @@ int g_iRenderer = 0; // 0=software, 1=DX6 (legacy D3D path), 2=DX9 (new backend)
 bool g_bRendererSoftwareExplicit = false; // Renderer=software was written explicitly
 char g_szAutoloadLevel[32] = "";   // Autoload=<levelcode> — skip the menu (set in reg.cpp)
 bool g_bScreenshot        = false; // Screenshot=1 — periodic DIB dumps (set in reg.cpp)
+bool g_bTeleport          = false; // -teleport <x>,<y>,<z> — CLI teleport (set in main.cpp; fired in gamewnd)
+float g_fTeleportX = 0, g_fTeleportY = 0, g_fTeleportZ = 0;
 int  g_iScreenshotTimeout = 10;    // ScreenshotTimeout=N — seconds between dumps
 
 //*********************************************************************************************

@@ -186,6 +186,10 @@ void OpenKey()
 	g_iScreenshotTimeout = GetModValue(REG_KEY_SCREENSHOT_TIMEOUT, 10);
 	if (g_iScreenshotTimeout < 1)
 		g_iScreenshotTimeout = 1;
+
+	// CLI-only: -teleport <x>,<y>,<z> (set in main.cpp; fires after the level loads).
+	g_bTeleport = false;
+	g_fTeleportX = g_fTeleportY = g_fTeleportZ = 0.0f;
 }
 
 void CloseKey(BOOL b_change_safemode)

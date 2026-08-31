@@ -253,9 +253,13 @@ extern bool g_bRendererSoftwareExplicit;
 //   Autoload=<levelcode>  — skip the menu and load data\<levelcode> directly at startup.
 //   Screenshot=1          — dump the presented DIB to screenshot_%04d.bmp every N sec.
 //   ScreenshotTimeout=N   — seconds between screenshots (default 10).
+//   -teleport <x>,<y>,<z>  — CLI: teleport the player to a world coord after the level loads
+//                           (fires PlayerTeleportToXYZ on the first game frame; see gamewnd).
 extern char g_szAutoloadLevel[32];
 extern bool g_bScreenshot;
 extern int  g_iScreenshotTimeout;
+extern bool g_bTeleport;
+extern float g_fTeleportX, g_fTeleportY, g_fTeleportZ;
 
 //*********************************************************************************************
 //
