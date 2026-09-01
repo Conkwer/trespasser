@@ -565,6 +565,24 @@ int DoWinMain(HINSTANCE hInstance,
 						dprintf("Trespasser-Plus: -teleport %.3f, %.3f, %.3f\n", fv[0], fv[1], fv[2]);
 					}
 				}
+				else if (_strnicmp(pszCmd + nDash, "screenshot-timeout", 18) == 0 ||
+					     _strnicmp(pszCmd + nDash, "shot-timeout", 12) == 0)
+				{
+					// -screenshot-timeout <n> = enable screenshots every n sec (overrides the
+					// config, which the game rewrites on exit and drops).
+					pszCmd += nDash + ((_strnicmp(pszCmd + nDash, "screenshot-timeout", 18) == 0) ? 18 : 12);
+					while (*pszCmd == ' ' || *pszCmd == '\t' || *pszCmd == ':' || *pszCmd == '=') pszCmd++;
+					g_iScreenshotTimeout = (int)strtol(pszCmd, NULL, 10);
+					if (g_iScreenshotTimeout < 1) g_iScreenshotTimeout = 1;
+					g_bScreenshot = true;
+					dprintf("Trespasser-Plus: -screenshot-timeout %d\n", g_iScreenshotTimeout);
+				}
+				else if (_strnicmp(pszCmd + nDash, "screenshot", 10) == 0 ||
+					     _strnicmp(pszCmd + nDash, "shot", 4) == 0)
+				{
+					g_bScreenshot = true;
+					dprintf("Trespasser-Plus: -screenshot\n");
+				}
 			}
 			while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t') pszCmd++;
 		}
