@@ -221,3 +221,37 @@ void PlayerTeleportToXYZ(float fX, float fY, float fZ)
 }
 
 
+//******************************************************************************************
+void PlayerTeleportToXYZYaw(float fX, float fY, float fZ, float fYawDeg, bool bSetYaw)
+{
+	CCamera* pcam = CWDbQueryActiveCamera().tGet();
+
+	if (pcam)
+	{
+		// Dump all render caches.
+		PurgeRenderCaches();
+
+		// If camera is attached to an instance, teleport it directly.
+		CInstance* pins_move = pcam->pinsAttached() ? pcam->pinsAttached() : pcam;
+
+		// Move the mover to the object.
+		CVector3<>      location(fX, fY, fZ);
+		CPlacement3<>   place = pins_move->pr3Presence();
+
+		place.v3Pos = location;
+
+		// Optionally set the camera/player yaw (degrees, right-hand around +Z/up).
+		// A pure yaw keeps the player upright (horizontal only, no pitch).
+		if (bSetYaw)
+		{
+			CAngle ang = (double)fYawDeg * dPI / 180.0;
+			place.r3Rot = CRotate3<>(CDir3<>((TReal)0, (TReal)0, (TReal)1), ang);
+		}
+
+		pins_move->Move(place);
+
+		// Use synchronous loads for the next 2 frames to ensure that all of the correct
+		// textures are loaded.
+		ps_renderDB->SetNoPageFrames(2);
+	}
+}

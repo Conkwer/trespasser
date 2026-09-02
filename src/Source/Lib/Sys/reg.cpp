@@ -190,6 +190,8 @@ void OpenKey()
 	// CLI-only: -teleport <x>,<y>,<z> (set in main.cpp; fires after the level loads).
 	g_bTeleport = false;
 	g_fTeleportX = g_fTeleportY = g_fTeleportZ = 0.0f;
+	g_bTeleportYaw = false;
+	g_fTeleportYaw = 0.0f;
 }
 
 void CloseKey(BOOL b_change_safemode)

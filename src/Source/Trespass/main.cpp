@@ -488,11 +488,11 @@ static int Base64Decode(const char* pIn, char* pOut, int nOutMax)
 	return nOut;
 }
 
-// Parse up to 3 floats from a comma/space-separated string. Returns the count.
+// Parse up to 4 floats from a comma/space-separated string. Returns the count.
 static int ParseTeleportFloats(const char* p, float* fv)
 {
 	int n = 0;
-	while (*p && n < 3)
+	while (*p && n < 4)
 	{
 		while (*p == ' ' || *p == '\t' || *p == ',' || *p == ':' || *p == '=') ++p;
 		if (!*p) break;
@@ -503,6 +503,24 @@ static int ParseTeleportFloats(const char* p, float* fv)
 		p = pEnd;
 	}
 	return n;
+}
+
+// Map a compass name (N/NE/ENE/SSW/...) to degrees clockwise from North (N=0, E=90,
+// S=180, W=270). Returns -1 if not a recognised compass name. The game's yaw=0 is set
+// by the map's coordinate system — calibrate which real-world direction is 0, then the
+// compass names align.
+static float CompassToDegrees(const char* p)
+{
+	struct SCompass { const char* szName; float fDeg; };
+	static const SCompass compass[] = {
+		{ "N",     0.0f }, { "NNE", 22.5f }, { "NE", 45.0f }, { "ENE", 67.5f },
+		{ "E",    90.0f }, { "ESE",112.5f }, { "SE",135.0f }, { "SSE",157.5f },
+		{ "S",   180.0f }, { "SSW",202.5f }, { "SW",225.0f }, { "WSW",247.5f },
+		{ "W",   270.0f }, { "WNW",292.5f }, { "NW",315.0f }, { "NNW",337.5f },
+	};
+	for (int i = 0; i < 16; ++i)
+		if (!_stricmp(p, compass[i].szName)) return compass[i].fDeg;
+	return -1.0f;
 }
 
 //---------------------------------------------------------------------------
@@ -615,7 +633,7 @@ int DoWinMain(HINSTANCE hInstance,
 						szTok[nTok++] = *pszCmd++;
 					szTok[nTok] = '\0';
 
-					float fv[3] = { 0, 0, 0 };
+					float fv[4] = { 0, 0, 0, 0 };
 					int nGot = 0;
 
 					if (bIsBase64Token(szTok))
@@ -627,7 +645,8 @@ int DoWinMain(HINSTANCE hInstance,
 					}
 					else
 					{
-						// plain form: parse the first token, then keep reading up to 2 more.
+						// plain form: parse x,y,z as floats, then an optional 4th arg as a
+						// yaw (a number in degrees OR a compass name like NE / SSW).
 						nGot = ParseTeleportFloats(szTok, fv);
 						for (int n = nGot; n < 3; ++n)
 						{
@@ -646,7 +665,40 @@ int DoWinMain(HINSTANCE hInstance,
 					{
 						g_bTeleport = true;
 						g_fTeleportX = fv[0]; g_fTeleportY = fv[1]; g_fTeleportZ = fv[2];
-						dprintf("Trespasser-Plus: -teleport %.3f, %.3f, %.3f\n", fv[0], fv[1], fv[2]);
+						g_bTeleportYaw = false;
+
+						// Optional 4th arg = yaw.
+						if (nGot >= 4)
+						{
+							// base64/numeric form already gave us a number.
+							g_fTeleportYaw = fv[3];
+							g_bTeleportYaw = true;
+							dprintf("Trespasser-Plus: -teleport %.3f, %.3f, %.3f (+yaw %.1f)\n",
+								fv[0], fv[1], fv[2], fv[3]);
+						}
+						else
+						{
+							// plain form: the 4th token may be a compass name (NE, SSW, ...).
+							char szYaw[64]; int nYaw = 0;
+							char* pSave = pszCmd;
+							while (*pszCmd == ' ' || *pszCmd == '\t') pszCmd++;
+							while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t' && nYaw < 63)
+								szYaw[nYaw++] = *pszCmd++;
+							szYaw[nYaw] = '\0';
+							float fYaw = CompassToDegrees(szYaw);
+							if (nYaw > 0 && fYaw >= 0.0f)
+							{
+								g_fTeleportYaw = fYaw;
+								g_bTeleportYaw = true;
+								dprintf("Trespasser-Plus: -teleport %.3f, %.3f, %.3f (+yaw %.1f = %s)\n",
+									fv[0], fv[1], fv[2], fYaw, szYaw);
+							}
+							else
+							{
+								// no yaw; leave pszCmd where it was.
+								pszCmd = pSave;
+							}
+						}
 					}
 				}
 				else if (_strnicmp(pszCmd + nDash, "screenshot-timeout", 18) == 0 ||

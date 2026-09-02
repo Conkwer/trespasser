@@ -179,6 +179,8 @@ char g_szAutoloadLevel[32] = "";   // Autoload=<levelcode> — skip the menu (se
 bool g_bScreenshot        = false; // Screenshot=1 — periodic DIB dumps (set in reg.cpp)
 bool g_bTeleport          = false; // -teleport <x>,<y>,<z> — CLI teleport (set in main.cpp; fired in gamewnd)
 float g_fTeleportX = 0, g_fTeleportY = 0, g_fTeleportZ = 0;
+bool g_bTeleportYaw        = false; // -teleport x,y,z,yawDeg — optional 4th arg
+float g_fTeleportYaw       = 0;     // yaw in degrees (0-360), around +Z/up
 int  g_iScreenshotTimeout = 10;    // ScreenshotTimeout=N — seconds between dumps
 
 //*********************************************************************************************

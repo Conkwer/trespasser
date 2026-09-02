@@ -260,6 +260,8 @@ extern bool g_bScreenshot;
 extern int  g_iScreenshotTimeout;
 extern bool g_bTeleport;
 extern float g_fTeleportX, g_fTeleportY, g_fTeleportZ;
+extern bool g_bTeleportYaw;      // -teleport x,y,z,yawDeg (optional 4th arg)
+extern float g_fTeleportYaw;      // yaw in degrees, 0-360 (right-hand around +Z/up)
 
 //*********************************************************************************************
 //
