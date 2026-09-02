@@ -27,6 +27,26 @@
 #include "keyremap.h"
 #include "..\Lib\Sys\reg.h"
 #include "..\lib\sys\reginit.hpp"
+
+// Base64 encode (Trespasser-Plus): SAVELOC writes the player pos as both the plain
+// "x, y, z" and a single base64 token (used as a -teleport arg, which looks like 3
+// flags if written plainly).
+static void Base64Encode(const char* pIn, char* pOut, int nOutMax)
+{
+	static const char* tbl = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	int nOut = 0, nLen = (int)strlen(pIn);
+	for (int i = 0; i < nLen && nOut < nOutMax - 4; i += 3)
+	{
+		int nVal = (unsigned char)pIn[i] << 16;
+		if (i + 1 < nLen) nVal |= (unsigned char)pIn[i + 1] << 8;
+		if (i + 2 < nLen) nVal |= (unsigned char)pIn[i + 2];
+		pOut[nOut++] = tbl[(nVal >> 18) & 63];
+		pOut[nOut++] = tbl[(nVal >> 12) & 63];
+		pOut[nOut++] = (i + 1 < nLen) ? tbl[(nVal >> 6) & 63] : '=';
+		pOut[nOut++] = (i + 2 < nLen) ? tbl[nVal & 63] : '=';
+	}
+	pOut[nOut] = 0;
+}
 #include "..\Lib\Audio\BackgroundMusic.hpp"
 #include "..\Lib\EntityDBase\MessageTypes\MsgStep.hpp"
 #include "..\Game\AI\AIMain.hpp"
@@ -294,15 +314,20 @@ bool ExecuteCheat(LPSTR pszCheat)
 			break;
 		case CHEAT_SAVELOC:
 			{
+				// Write the player pos as both the plain "x, y, z" and a single base64
+				// token (usable directly as -teleport <base64>).
+				char szCoords[128];
+				wsprintf(szCoords, "%.1f, %.1f, %.1f",
+					gpPlayer->v3Pos().tX, gpPlayer->v3Pos().tY, gpPlayer->v3Pos().tZ);
+				char szB64[256];
+				Base64Encode(szCoords, szB64, sizeof(szB64));
 				FILE* f = fopen("location.log", "a");
 				if (f)
 				{
-					fprintf(f, "%.1f, %.1f, %.1f\n",
-						gpPlayer->v3Pos().tX,
-						gpPlayer->v3Pos().tY,
-						gpPlayer->v3Pos().tZ);
+					fprintf(f, "%s (%s)\n", szCoords, szB64);
 					fclose(f);
 				}
+				dprintf("SAVELOC: %s (%s)\n", szCoords, szB64);
 			}
 			break;
 		case CHEAT_JUMP:
