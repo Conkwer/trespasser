@@ -446,6 +446,66 @@ bool ValidateDiskSpace(int iMB)
 //  History:    19-Aug-98    SHernd  Created
 //
 //---------------------------------------------------------------------------
+// Base64 + teleport-coordinate helpers (Trespasser-Plus). The plain coord form
+// "-1902.9, -933.8, 28.1" looks like 3 separate flags to the shell; a single
+// base64 token (e.g. LTE5MDIuOSwgLTkzMy44LCAyOC4x) is one clean arg.
+//---------------------------------------------------------------------------
+static bool bIsBase64Char(char c)
+{
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+	       (c >= '0' && c <= '9') || c == '+' || c == '/' || c == '=';
+}
+
+static bool bIsBase64Token(const char* p)
+{
+	if (!*p) return false;
+	for (; *p; ++p)
+		if (!bIsBase64Char(*p)) return false;
+	return true;
+}
+
+// Decode base64 into pOut (NUL-terminated). Returns the byte length, or -1 if the
+// input contains an invalid base64 char.
+static int Base64Decode(const char* pIn, char* pOut, int nOutMax)
+{
+	static const char* tbl = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	int nOut = 0, nVal = 0, nBits = -8;
+	for (const char* p = pIn; *p; ++p)
+	{
+		if (*p == '=') break;                       // padding
+		const char* q = strchr(tbl, *p);
+		if (!q) return -1;
+		nVal = (nVal << 6) | (int)(q - tbl);
+		nBits += 6;
+		if (nBits >= 0)
+		{
+			if (nOut >= nOutMax - 1) return -1;
+			pOut[nOut++] = (char)((nVal >> nBits) & 0xFF);
+			nBits -= 8;
+		}
+	}
+	pOut[nOut] = 0;
+	return nOut;
+}
+
+// Parse up to 3 floats from a comma/space-separated string. Returns the count.
+static int ParseTeleportFloats(const char* p, float* fv)
+{
+	int n = 0;
+	while (*p && n < 3)
+	{
+		while (*p == ' ' || *p == '\t' || *p == ',' || *p == ':' || *p == '=') ++p;
+		if (!*p) break;
+		char* pEnd = NULL;
+		float f = (float)strtod(p, &pEnd);
+		if (pEnd == p) break;
+		fv[n++] = f;
+		p = pEnd;
+	}
+	return n;
+}
+
+//---------------------------------------------------------------------------
 int DoWinMain(HINSTANCE hInstance,
               HINSTANCE hPrevInstance,
               LPSTR lpCmdLine,
@@ -542,22 +602,46 @@ int DoWinMain(HINSTANCE hInstance,
 				}
 				else if (_strnicmp(pszCmd + nDash, "teleport", 8) == 0)
 				{
-					// -teleport <x>,<y>,<z>  (also space-separated). Fire PlayerTeleportToXYZ
-					// on the first game frame (gamewnd.cpp InnerLoopCall). Allows leading '-'.
+					// -teleport <x>,<y>,<z>  (space-separated ok)  OR
+					// -teleport <base64("x, y, z")>   — a single clean arg (plain coords look
+					// like 3 separate flags to the shell). Fire PlayerTeleportToXYZ on the
+					// first game frame (gamewnd.cpp InnerLoopCall). Allows leading '-'.
 					pszCmd += nDash + 8;
+					while (*pszCmd == ' ' || *pszCmd == '\t') pszCmd++;
+
+					// Capture the first whitespace-delimited token.
+					char szTok[512]; int nTok = 0;
+					while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t' && nTok < 511)
+						szTok[nTok++] = *pszCmd++;
+					szTok[nTok] = '\0';
+
 					float fv[3] = { 0, 0, 0 };
 					int nGot = 0;
-					for (int n = 0; n < 3 && *pszCmd; n++)
+
+					if (bIsBase64Token(szTok))
 					{
-						while (*pszCmd == ' ' || *pszCmd == '\t' || *pszCmd == ',' || *pszCmd == ':' || *pszCmd == '=') pszCmd++;
-						if (!*pszCmd) break;
-						char* pEnd = NULL;
-						fv[n] = (float)strtod(pszCmd, &pEnd);
-						if (pEnd == pszCmd) break;
-						nGot++;
-						while (*pEnd && *pEnd != ' ' && *pEnd != '\t' && *pEnd != ',') pEnd++;
-						pszCmd = pEnd;
+						// base64 form: decode, then parse the floats from the decoded text.
+						char szDec[256];
+						if (Base64Decode(szTok, szDec, sizeof(szDec)) >= 0)
+							nGot = ParseTeleportFloats(szDec, fv);
 					}
+					else
+					{
+						// plain form: parse the first token, then keep reading up to 2 more.
+						nGot = ParseTeleportFloats(szTok, fv);
+						for (int n = nGot; n < 3; ++n)
+						{
+							while (*pszCmd == ' ' || *pszCmd == '\t') pszCmd++;
+							if (!*pszCmd) break;
+							char* pEnd = NULL;
+							float f = (float)strtod(pszCmd, &pEnd);
+							if (pEnd == pszCmd) break;
+							fv[n] = f; nGot++;
+							while (*pEnd && *pEnd != ' ' && *pEnd != '\t') pEnd++;
+							pszCmd = pEnd;
+						}
+					}
+
 					if (nGot >= 3)
 					{
 						g_bTeleport = true;
