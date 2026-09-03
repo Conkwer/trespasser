@@ -505,24 +505,6 @@ static int ParseTeleportFloats(const char* p, float* fv)
 	return n;
 }
 
-// Map a compass name (N/NE/ENE/SSW/...) to degrees clockwise from North (N=0, E=90,
-// S=180, W=270). Returns -1 if not a recognised compass name. The game's yaw=0 is set
-// by the map's coordinate system — calibrate which real-world direction is 0, then the
-// compass names align.
-static float CompassToDegrees(const char* p)
-{
-	struct SCompass { const char* szName; float fDeg; };
-	static const SCompass compass[] = {
-		{ "N",     0.0f }, { "NNE", 22.5f }, { "NE", 45.0f }, { "ENE", 67.5f },
-		{ "E",    90.0f }, { "ESE",112.5f }, { "SE",135.0f }, { "SSE",157.5f },
-		{ "S",   180.0f }, { "SSW",202.5f }, { "SW",225.0f }, { "WSW",247.5f },
-		{ "W",   270.0f }, { "WNW",292.5f }, { "NW",315.0f }, { "NNW",337.5f },
-	};
-	for (int i = 0; i < 16; ++i)
-		if (!_stricmp(p, compass[i].szName)) return compass[i].fDeg;
-	return -1.0f;
-}
-
 //---------------------------------------------------------------------------
 int DoWinMain(HINSTANCE hInstance,
               HINSTANCE hPrevInstance,
@@ -667,10 +649,10 @@ int DoWinMain(HINSTANCE hInstance,
 						g_fTeleportX = fv[0]; g_fTeleportY = fv[1]; g_fTeleportZ = fv[2];
 						g_bTeleportYaw = false;
 
-						// Optional 4th arg = yaw.
+						// Optional 4th arg = yaw (degrees). Works for both the base64/numeric
+						// form (4 floats) AND the plain space-separated form.
 						if (nGot >= 4)
 						{
-							// base64/numeric form already gave us a number.
 							g_fTeleportYaw = fv[3];
 							g_bTeleportYaw = true;
 							dprintf("Trespasser-Plus: -teleport %.3f, %.3f, %.3f (+yaw %.1f)\n",
@@ -678,24 +660,25 @@ int DoWinMain(HINSTANCE hInstance,
 						}
 						else
 						{
-							// plain form: the 4th token may be a compass name (NE, SSW, ...).
+							// plain form: read the 4th token as a yaw degrees number.
 							char szYaw[64]; int nYaw = 0;
 							char* pSave = pszCmd;
 							while (*pszCmd == ' ' || *pszCmd == '\t') pszCmd++;
 							while (*pszCmd && *pszCmd != ' ' && *pszCmd != '\t' && nYaw < 63)
 								szYaw[nYaw++] = *pszCmd++;
 							szYaw[nYaw] = '\0';
-							float fYaw = CompassToDegrees(szYaw);
-							if (nYaw > 0 && fYaw >= 0.0f)
+							char* pEnd = NULL;
+							float fYaw = (float)strtod(szYaw, &pEnd);
+							if (nYaw > 0 && pEnd != szYaw && *pEnd == '\0')
 							{
 								g_fTeleportYaw = fYaw;
 								g_bTeleportYaw = true;
-								dprintf("Trespasser-Plus: -teleport %.3f, %.3f, %.3f (+yaw %.1f = %s)\n",
-									fv[0], fv[1], fv[2], fYaw, szYaw);
+								dprintf("Trespasser-Plus: -teleport %.3f, %.3f, %.3f (+yaw %.1f)\n",
+									fv[0], fv[1], fv[2], fYaw);
 							}
 							else
 							{
-								// no yaw; leave pszCmd where it was.
+								// not a yaw; leave pszCmd where it was.
 								pszCmd = pSave;
 							}
 						}
