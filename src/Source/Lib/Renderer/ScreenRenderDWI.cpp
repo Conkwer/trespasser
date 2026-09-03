@@ -615,6 +615,14 @@ void CScreenRenderDWIT<TPIX>::DrawPolygon(CRenderPolygon& rp)
 		return;
 	}
 
+	// BUMP-DIAG: a bump-mapped poly fell through to the SOFTWARE path.
+	static int s_bumpSoft = 0;
+	if (s_bumpSoft < 24 && rp.ptexTexture && rp.ptexTexture->seterfFeatures[erfBUMP])
+		dprintf("D3D9 BUMP-SW[%d]: tex=%08x ehw=%d fullhw=%d mip=%d\n",
+			s_bumpSoft++, (unsigned)rp.ptexTexture.ptGet(), (int)rp.ehwHardwareFlags,
+			(int)rp.bFullHardware, (int)rp.iMipLevel);
+
+
 	//
 	// Hardware is not being use for this primitive, make sure the render is in software mode.
 	//

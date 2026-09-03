@@ -1264,7 +1264,12 @@ class CPartition::CPriv : CPartition
 		{
 			if (pmsh->pasfSurfaces[u].ptexTexture && pmsh->pasfSurfaces[u].ptexTexture->seterfFeatures[erfBUMP])
 			{
-				return false;
+				// The D3D6 path rasterised bump maps in software; in the D3D9 path the CPU
+				// software rasterizer is not wired, so bump meshes were being dropped
+				// (invisible). DX9 renders them as ordinary textured hardware polys — no
+				// dynamic bump shading, but the base texture is visible.
+				if (g_iRenderer != 2)
+					return false;
 			}
 		}
 
