@@ -454,8 +454,9 @@ void* D3D9CreateTexture(int iWidth, int iHeight, DWORD dwFormat)
 		return NULL;
 	IDirect3DTexture9* pt = NULL;
 	// MANAGED: survives device resets; CPU LockRect is cheap and direct.
-	if (FAILED(s_pDevice->CreateTexture(iWidth, iHeight, 1, 0,
-		(D3DFORMAT)dwFormat, D3DPOOL_MANAGED, &pt, NULL)))
+	HRESULT hr = s_pDevice->CreateTexture(iWidth, iHeight, 1, 0,
+		(D3DFORMAT)dwFormat, D3DPOOL_MANAGED, &pt, NULL);
+	if (FAILED(hr))
 		return NULL;
 	return pt;
 }

@@ -436,10 +436,17 @@ public:
 		TrackSystem(etrPool);
 	#endif
 
-		// Make sure that there is enough memory in the system.
-		int i_requested_bytes = i_width * i_height * 2;
-		if (i_requested_bytes + iBytesUsed > iBytesAvailable)
-			return false;
+		// In the D3D9 (Track C) path textures are MANAGED (driver-managed), so there is no
+		// fixed AGP pool budget to enforce. Only apply the budget check in the legacy D3D6
+		// path; otherwise dx9 object textures fail to allocate (iBytesAvailable stays 0)
+		// and render untextured (white).
+		if (g_iRenderer != 2)
+		{
+			// Make sure that there is enough memory in the system.
+			int i_requested_bytes = i_width * i_height * 2;
+			if (i_requested_bytes + iBytesUsed > iBytesAvailable)
+				return false;
+		}
 
 		// Create the raster.
 		rpras = rptr_cast(CRaster, rptr_new CRasterD3D(CRasterD3D::CInitDiscreet

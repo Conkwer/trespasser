@@ -829,21 +829,6 @@ public:
 		Assert(rp.ptexTexture);
 		Assert(bActive);
 
-		// BUMP-DIAG: log bump-mapped polys reaching the HARDWARE draw path.
-		static int s_bumpHard = 0;
-		if (s_bumpHard < 24 && rp.ptexTexture && rp.ptexTexture->seterfFeatures[erfBUMP])
-		{
-			CRaster* pras0 = rp.ptexTexture->prasGetTexture(0).ptGet();
-			CRaster* link0 = pras0 ? pras0->prasLink.ptGet() : 0;
-			CRaster* prasB = prasGetBestD3DRaster(rp);
-			dprintf("D3D9 BUMPHW[%d]: tex=%08x ehw=%d fullhw=%d mip=%d ras0=%08x link0=%08x link0d3d=%08x best=%08x bestd3d=%08x\n",
-				s_bumpHard++, (unsigned)rp.ptexTexture.ptGet(), (int)rp.ehwHardwareFlags, (int)rp.bFullHardware,
-				(int)rp.iMipLevel, (unsigned)pras0, (unsigned)link0,
-				link0 ? (unsigned)link0->pd3dtexGet() : 0, (unsigned)prasB,
-				prasB ? (unsigned)prasB->pd3dtexGet() : 0);
-		}
-
-
 		// Start the hardware lock.
 		SetD3DMode(ed3drHARDWARE_LOCK);
 
@@ -1240,6 +1225,16 @@ public:
 
 		// Upload textures.
 		priv_self.UploadPolygonArray(arp);
+	}
+
+	//******************************************************************************************
+	void CScreenRenderAuxD3D::EnsureTextureUploaded(CRenderPolygon& rp)
+	{
+		// Uploads the polygon's texture on-demand if it has no D3D9 twin (used by the batch
+		// rasterizer so un-uploaded object textures aren't drawn untextured/white).
+		if (!rp.ptexTexture)
+			return;
+		priv_self.UploadPolygon(rp);
 	}
 
 

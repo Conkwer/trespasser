@@ -231,7 +231,17 @@ void RasterizeOpaque(CMArray<CRenderPolygon*>& appoly)
 
 		// Necessary states.
 		d3dstState.SetAddressing(prp->eamAddressMode);
-		d3dstState.SetTexture(prasGetBestD3DRaster(*prp));
+
+		// On-demand texture upload: if the texture has no D3D9 twin yet, upload it so the
+		// object isn't drawn untextured (white).
+		CRaster* prasBest = prasGetBestD3DRaster(*prp);
+		if (!prasBest)
+		{
+			srd3dRenderer.EnsureTextureUploaded(*prp);
+			prasBest = prasGetBestD3DRaster(*prp);
+		}
+
+		d3dstState.SetTexture(prasBest);
 
 		// Set flag for toggling fogging.
 		bool b_fog = false;

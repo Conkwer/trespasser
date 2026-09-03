@@ -352,6 +352,18 @@ public:
 
 	//******************************************************************************************
 	//
+	void EnsureTextureUploaded
+	(
+		CRenderPolygon& rp	// Polygon whose texture should be uploaded.
+	);
+	//
+	// Uploads the polygon's texture on-demand if it has no D3D9 twin. Used by the batch
+	// rasterizer so un-uploaded object textures aren't drawn untextured (white).
+	//
+	//**************************************
+
+	//******************************************************************************************
+	//
 	void SetD3DFlagForPolygon
 	(
 		CRenderPolygon& rpoly	// Polygons to set the hardware flags for.

@@ -1067,6 +1067,10 @@ public:
 		// To do:
 		//		Special test for NVidia.
 		//
+		// In the D3D9 (Track C) path the texture is a single MANAGED D3D9 texture, not a
+		// DirectDraw surface pair; verify that D3D9 texture was created instead.
+		if (g_iRenderer == 2)
+			return pd3dtexTex != 0;
 		return (pddsSurfaceSys != 0) && (pddsSurfaceVid != 0);
 	}
 
