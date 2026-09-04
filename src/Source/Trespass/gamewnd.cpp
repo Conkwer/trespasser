@@ -317,7 +317,7 @@ bool ExecuteCheat(LPSTR pszCheat)
 				// Write the player pos as both the plain "x, y, z" and a single base64
 				// token (usable directly as -teleport <base64>).
 				char szCoords[128];
-				wsprintf(szCoords, "%.1f, %.1f, %.1f",
+				sprintf(szCoords, "%.1f, %.1f, %.1f",
 					gpPlayer->v3Pos().tX, gpPlayer->v3Pos().tY, gpPlayer->v3Pos().tZ);
 				char szB64[256];
 				Base64Encode(szCoords, szB64, sizeof(szB64));

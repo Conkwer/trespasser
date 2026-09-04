@@ -1592,6 +1592,22 @@ rptr<CRaster> prasReadBMP(const char* str_bitmap_name, bool b_vid)
 		if (!s_pBitsDib || s_iDibWidth <= 0 || s_iDibHeight <= 0)
 			return;
 
+		// Skip entirely-black frames: the first hardware-rendered frame is a black
+		// setup/loading frame (the world appears from frame 2+). Dumping it wastes a
+		// slot and produces a useless all-black BMP. Don't increment the shot counter
+		// so the first real frame becomes screenshot_0001.
+		{
+			int b_has_content = 0;
+			for (int y = 0; y < s_iDibHeight && !b_has_content; ++y)
+			{
+				const unsigned short* pScan = (const unsigned short*)((const char*)s_pBitsDib + y * s_iDibPitch);
+				for (int x = 0; x < s_iDibWidth; ++x)
+					if (pScan[x]) { b_has_content = 1; break; }
+			}
+			if (!b_has_content)
+				return;
+		}
+
 		char szFile[_MAX_PATH];
 		wsprintf(szFile, "screenshot_%04d.bmp", ++s_iShotNum);
 		HANDLE hFile = CreateFile(szFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
