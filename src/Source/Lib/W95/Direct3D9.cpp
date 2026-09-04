@@ -45,6 +45,15 @@ static int                 s_iTex2DWidth   = 0;
 static int                 s_iTex2DHeight  = 0;
 static BOOL                s_bHardwareFrame = FALSE;
 
+// Current render target (backbuffer surface) — used by the readback. The returned
+// pointer is borrowed (do not release); GetRenderTargetData takes it as its first arg.
+static void*               s_pRenderTarget = NULL;
+
+// Readback staging surface (sysmem offscreen-plain, same size as the backbuffer).
+static IDirect3DSurface9*  s_pReadback    = NULL;
+static int                 s_iReadbackW   = 0;
+static int                 s_iReadbackH   = 0;
+
 // Texture is stored pow2 (1024x512) so it works on any D3D9 device / wrapper;
 // the visible area is scaled by these UVs.
 #define D3D9_TEX_W   1024
@@ -180,6 +189,24 @@ BOOL D3D9Init(HWND hwnd, int iWidth, int iHeight, BOOL bFullScreen)
 
 void D3D9Shutdown(void)
 {
+	// Release the per-frame present + readback resources FIRST (they hold refs on
+	// the device). Without this the device/D3D9/DLL can't be cleanly freed, and
+	// dgVoodoo2 has to tear everything down at process exit -> ~10s close.
+	if (s_pTex2D)
+	{
+		s_pTex2D->Release();
+		s_pTex2D = NULL;
+	}
+	if (s_pReadback)
+	{
+		s_pReadback->Release();
+		s_pReadback = NULL;
+	}
+	if (s_pRenderTarget)
+	{
+		((IDirect3DSurface9*)s_pRenderTarget)->Release();
+		s_pRenderTarget = NULL;
+	}
 	if (s_pDevice)
 	{
 		s_pDevice->Release();
@@ -279,7 +306,7 @@ void* D3D9GetD3D(void)
 
 // The current render target (backbuffer surface) — used by the readback. The returned
 // pointer is borrowed (do not release); GetRenderTargetData takes it as its first arg.
-static void* s_pRenderTarget = NULL;
+// (declared at the top of the file so D3D9Shutdown can release it)
 
 void* D3D9GetRenderTarget(void)
 {
@@ -515,10 +542,8 @@ void D3D9ReleaseTexture(void* pTex)
 		((IDirect3DTexture9*)pTex)->Release();
 }
 
-// Readback staging surface (sysmem offscreen-plain, same size as the backbuffer).
-static IDirect3DSurface9* s_pReadback = NULL;
-static int s_iReadbackW = 0;
-static int s_iReadbackH = 0;
+// (s_pReadback / s_iReadbackW/H are declared at the top of the file so D3D9Shutdown
+//  can release them.)
 
 // X8R8G8B8 -> RGB565 (inverse of Convert565To8888).
 static void Convert8888To565(const void* pSrc, void* pDst, int iWidth, int iHeight,

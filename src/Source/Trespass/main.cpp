@@ -28,6 +28,7 @@
 #include "tpassglobals.h"
 #include "gblinc/buildver.hpp"
 #include "Lib/W95/Direct3DCards.hpp"
+#include "Lib/W95/Direct3D9API.h"
 #include "Version.hpp"
 
 
@@ -975,6 +976,12 @@ Cleanup:
 	delete CAudio::pcaAudio;
 
     PostQuitMessage(0);
+
+	// D3D9: explicitly release the device/D3D9/DLL + the present/readback resources
+	// BEFORE the process exits. Without this dgVoodoo2 tears them down at process
+	// exit (slow ~10s close, and it must free every leaked texture there).
+	if (g_iRenderer == 2)
+		D3D9Shutdown();
 
 	// BUGBUG:  Close out file system
 

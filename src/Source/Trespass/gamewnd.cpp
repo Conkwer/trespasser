@@ -314,11 +314,26 @@ bool ExecuteCheat(LPSTR pszCheat)
 			break;
 		case CHEAT_SAVELOC:
 			{
-				// Write the player pos as both the plain "x, y, z" and a single base64
-				// token (usable directly as -teleport <base64>).
+				// Write the player pos + camera yaw as "x, y, z, yawDeg". Base64 gives a
+				// single unambiguous -teleport token that ALSO carries the point of view
+				// (the 4th value), so the view direction survives the teleport.
+				float fYaw = 0.0f;
+				CCamera* pcam = CWDbQueryActiveCamera().tGet();
+				if (pcam)
+				{
+					CPlacement3<> place = pcam->pr3Presence();
+					// Pure-yaw extraction: rotate the world X-axis through the camera's
+					// rotation; the horizontal angle is the yaw (ignores any pitch/roll,
+					// which matches the -teleport yaw convention).
+					CDir3<> d3x((TReal)1, (TReal)0, (TReal)0);
+					CDir3<> dx = d3x * place.r3Rot;
+					double dAng = atan2((double)dx.tY, (double)dx.tX) * 180.0 / dPI;
+					if (dAng < 0.0) dAng += 360.0;
+					fYaw = (float)dAng;
+				}
 				char szCoords[128];
-				sprintf(szCoords, "%.1f, %.1f, %.1f",
-					gpPlayer->v3Pos().tX, gpPlayer->v3Pos().tY, gpPlayer->v3Pos().tZ);
+				sprintf(szCoords, "%.1f, %.1f, %.1f, %.1f",
+					gpPlayer->v3Pos().tX, gpPlayer->v3Pos().tY, gpPlayer->v3Pos().tZ, fYaw);
 				char szB64[256];
 				Base64Encode(szCoords, szB64, sizeof(szB64));
 				FILE* f = fopen("location.log", "a");
