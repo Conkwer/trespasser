@@ -156,6 +156,20 @@ public:
 		// Get the common conversion type.
 		ED3DCommonFormat d3dcom = d3dDriver.d3dcomGetCommonFormat(ed3dtexType);
 
+		// CONV-DIAG: log the common format + first palette entries (color-corruption hunt).
+		static int s_convDiag = 0;
+		if (s_convDiag++ < 6)
+		{
+			CColour c0 = ppalPalette->aclrPalette.uLen > 0 ? ppalPalette->aclrPalette[0] : CColour(0,0,0);
+			CColour c1 = ppalPalette->aclrPalette.uLen > 1 ? ppalPalette->aclrPalette[1] : CColour(0,0,0);
+			CColour c2 = ppalPalette->aclrPalette.uLen > 2 ? ppalPalette->aclrPalette[2] : CColour(0,0,0);
+			dprintf("D3D9 CONV[%d]: d3dcom=%d palLen=%d c0=(%d,%d,%d) c1=(%d,%d,%d) c2=(%d,%d,%d)\n",
+				s_convDiag, (int)d3dcom, (int)ppalPalette->aclrPalette.uLen,
+				c0.u1Red, c0.u1Green, c0.u1Blue, c1.u1Red, c1.u1Green, c1.u1Blue,
+				c2.u1Red, c2.u1Green, c2.u1Blue);
+		}
+
+
 		// If the conversion table does not already exist, create one.
 		if (!pu2ConversionTable)
 		{
