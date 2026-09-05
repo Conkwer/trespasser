@@ -50,6 +50,9 @@
 #include "RasterD3D.hpp"
 #include "Lib/Sys/Profile.hpp"
 
+#include <stdio.h>
+#include <string.h>
+
 
 //
 // Module specific variables.
@@ -111,9 +114,14 @@ public:
 		// Get the texture type.
 		ed3dtexType = pras_d3d->ed3dtexGet();
 
-		// Construct the hash value.
+		// Construct the hash value from the palette's CURRENT content. Do NOT use the
+		// lazy-cached u4GetHashValue(): a shared/reused palette object is reloaded with
+		// new content per texture, but its cached hash never updates, so the SetConv
+		// cache would hand back the wrong (stale) conversion table -> colour garble.
 		u4HashValue  = uint32(ed3dtexType);
-		u4HashValue ^= ppalPalette->u4GetHashValue();
+		for (uint u = 0; u < ppalPalette->aclrPalette.uLen; ++u)
+			u4HashValue ^= ppalPalette->aclrPalette[u].u4Value << (u4HashValue & 2);
+		u4HashValue ^= (uint32)(unsigned)ppalPalette;
 	}
 
 	// Destructor.
@@ -450,6 +458,78 @@ void ConvertRaster(CRasterD3D* pras_d3d, rptr<CRaster> pras_mem, CColour clr)
 
 	int i_width      = min(pras_d3d->iWidth,  pras_mem->iWidth);
 	int i_height     = min(pras_d3d->iHeight, pras_mem->iHeight);
+
+	// CONVTEST: capture source indices + pu2 results for the first poly (is the
+	// 8-bit->565 conversion table wrong, or is the source read wrong?)
+	{
+		static int s_cdiag = 0;
+		if (s_cdiag < 20)
+		{
+			int i = s_cdiag++;
+			int i_pal = (pras_mem->pxf.ppalAttached) ? (int)pras_mem->pxf.ppalAttached->aclrPalette.uLen : -1;
+			unsigned u_palptr = (unsigned)pras_mem->pxf.ppalAttached;
+			unsigned u_palhash = pras_mem->pxf.ppalAttached ? pras_mem->pxf.ppalAttached->u4GetHashValue() : 0;
+			dprintf("CONVTEST[%d]: src=%p ed3dtex=%d d3dcom=%d palPtr=%08x palHash=%08x palLen=%d src_w=%d src_h=%d src_line=%d d3d_w=%d d3d_h=%d d3d_line=%d bits=%d/%d\n",
+				i, pras_mem.ptGet(), (int)pras_d3d->ed3dtexGet(),
+				(int)d3dDriver.d3dcomGetCommonFormat(pras_d3d->ed3dtexGet()),
+				u_palptr, u_palhash, i_pal, pras_mem->iWidth, pras_mem->iHeight, pras_mem->iLinePixels,
+				pras_d3d->iWidth, pras_d3d->iHeight, pras_d3d->iLinePixels, pras_d3d->iPixelBits, pras_mem->iPixelBits);
+			for (int k = 0; k < 6 && k < i_width; ++k)
+			{
+				int sv = pu1_mem[k];
+				CColour c = pras_mem->pxf.ppalAttached->aclrPalette.atArray[sv];
+				dprintf("  src[%d]=%d pal=(%d,%d,%d) pu2=%04x\n", k, sv, c.u1Red, c.u1Green, c.u1Blue, (unsigned)pu2[sv]);
+			}
+		}
+	}
+
+
+	// SRC-DIAG: log geometry + whether source indices exceed the palette length (->garbage).
+	{
+		static const void* s_srcdiag[40];
+		static int         s_srcdiag_n = 0;
+		int   b_new = 1;
+		for (int k = 0; k < s_srcdiag_n; ++k) if (s_srcdiag[k] == pras_mem.ptGet()) b_new = 0;
+		if (b_new && s_srcdiag_n < 40)
+		{
+			s_srcdiag[s_srcdiag_n++] = pras_mem.ptGet();
+			int i_pal = (pras_mem->pxf.ppalAttached) ? (int)pras_mem->pxf.ppalAttached->aclrPalette.uLen : -1;
+			int i_oor = 0, i_max = 0;
+			const uint8* p = pu1_mem;
+			for (int x = 0; x < i_width; ++x) { int v = p[x]; if (v > i_max) i_max = v; if (v >= i_pal) ++i_oor; }
+			dprintf("D3D9 SRC[%d]: src=%p w=%d h=%d line=%d bits=%d palLen=%d width=%d hgt=%d maxIdx=%d overPal=%d\n",
+				s_srcdiag_n-1, pras_mem.ptGet(), pras_mem->iWidth, pras_mem->iHeight,
+				pras_mem->iLinePixels, pras_mem->iPixelBits, i_pal,
+				pras_d3d->iWidth, pras_d3d->iHeight, i_max, i_oor);
+
+			// TDMP: write the 8-bit source indices + palette to files for visual inspection.
+			if (s_srcdiag_n <= 30)
+			{
+				char sz_idx[64], sz_pal[64];
+				sprintf(sz_idx, "/tmp/tdump_%d.idx", s_srcdiag_n-1);
+				sprintf(sz_pal, "/tmp/tdump_%d.pal", s_srcdiag_n-1);
+				FILE* f = fopen(sz_idx, "wb");
+				if (f) {
+					const uint8* ps = pu1_mem;
+					for (int y = 0; y < i_height; ++y) { fwrite(ps, 1, i_width, f); ps += i_mem_stride; }
+					fclose(f);
+				}
+				FILE* fp = fopen(sz_pal, "wb");
+				if (fp && pras_mem->pxf.ppalAttached) {
+					int n = pras_mem->pxf.ppalAttached->aclrPalette.uLen;
+					unsigned char rgb[256*3];
+					for (int k = 0; k < 256; ++k) {
+						if (k < n) { CColour c = pras_mem->pxf.ppalAttached->aclrPalette.atArray[k];
+							rgb[k*3]=c.u1Red; rgb[k*3+1]=c.u1Green; rgb[k*3+2]=c.u1Blue; }
+						else { rgb[k*3]=0; rgb[k*3+1]=0; rgb[k*3+2]=0; }
+					}
+					fwrite(rgb, 1, sizeof(rgb), fp);
+					fclose(fp);
+				}
+			}
+		}
+	}
+
 
 	// Dumb conversion for now.
 	for (int j = 0; j < i_height; ++j)

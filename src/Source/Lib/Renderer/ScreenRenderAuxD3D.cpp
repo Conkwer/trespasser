@@ -544,6 +544,24 @@ public:
 
 		rptr<CRaster> pras = rp.ptexTexture->prasGetTexture(rp.iMipLevel);
 
+		// MIP-DIAG: log mip level + source raster geometry for the corruption hunt.
+		{
+			static const void* s_mipdiag[16];
+			static int         s_mipdiag_n = 0;
+			int   b_mnew = 1;
+			for (int k = 0; k < s_mipdiag_n; ++k) if (s_mipdiag[k] == pras.ptGet()) b_mnew = 0;
+			if (b_mnew && s_mipdiag_n < 16)
+			{
+				s_mipdiag[s_mipdiag_n++] = pras.ptGet();
+				dprintf("D3D9 MIP[%d]: mip=%d src=%p w=%d h=%d line=%d bits=%d colour=%08x hash=%08x BUMP=%d TRANS=%d\n",
+					s_mipdiag_n-1, rp.iMipLevel, pras.ptGet(), pras->iWidth, pras->iHeight,
+					pras->iLinePixels, pras->iPixelBits, (uint)rp.ptexTexture->d3dpixColour,
+					(uint)rp.ptexTexture->u4HashValue, (int)rp.ptexTexture->seterfFeatures[erfBUMP],
+					(int)rp.ptexTexture->seterfFeatures[erfTRANSPARENT]);
+			}
+		}
+
+
 		// Test if a link was already established.
 		if (pras->prasLink)
 		{

@@ -224,6 +224,11 @@ void RasterizeOpaque(CMArray<CRenderPolygon*>& appoly)
 	d3dstState.SetAlpha();
 	d3dstState.SetSpecular();
 
+	// OPAQUE-DIAG: log the CLUT modulation colour + texture for the first polys
+	// (to find why the walls render green/black instead of their wood texture).
+	static int s_opaqueDiag = 0;
+
+
 	// Rasterize list.
 	for (uint u_poly = 0; u_poly < appoly.uLen; ++u_poly)
 	{
@@ -239,6 +244,63 @@ void RasterizeOpaque(CMArray<CRenderPolygon*>& appoly)
 		{
 			srd3dRenderer.EnsureTextureUploaded(*prp);
 			prasBest = prasGetBestD3DRaster(*prp);
+		}
+
+		// WALL-DUMP: write the source 8-bit raster (+palette) AND the converted 565 the
+		// first few polys render with, so we can tell if the garble is the source data
+		// or the 8-bit->565 conversion.
+		{
+			static int s_walldump = 0;
+			if (s_walldump < 12 && prasBest)
+			{
+				int i = s_walldump++;
+				dprintf("WALLDUMP[%d]: hash=%08x mip=%d src=%p d3d=%p\n", i,
+					(uint)prp->ptexTexture->u4HashValue, (int)prp->iMipLevel,
+					prp->ptexTexture->prasGetTexture(prp->iMipLevel).ptGet(), prasBest);
+				char szwf[64];
+				sprintf(szwf, "/tmp/wall_%d.565", i);
+				FILE* fpw = fopen(szwf, "wb");
+				if (fpw)
+				{
+					int iw = prasBest->iWidth, ih = prasBest->iHeight, iline = prasBest->iLinePixels;
+					fwrite(&iw, 4, 1, fpw); fwrite(&ih, 4, 1, fpw); fwrite(&iline, 4, 1, fpw);
+					const unsigned short* ps2 = (const unsigned short*)prasBest->pSurface;
+					for (int y = 0; y < ih; ++y)
+						fwrite(ps2 + y * iline, 2, iw, fpw);
+					fclose(fpw);
+				}
+				// source 8-bit raster + palette
+				rptr<CRaster> prasSrc = prp->ptexTexture->prasGetTexture(prp->iMipLevel);
+				if (prasSrc && prasSrc->iPixelBits <= 8)
+				{
+					char szs[64], szp[64];
+					sprintf(szs, "/tmp/wall_%d.src", i); sprintf(szp, "/tmp/wall_%d.pal", i);
+					FILE* fs = fopen(szs, "wb");
+					if (fs)
+					{
+						int iw = prasSrc->iWidth, ih = prasSrc->iHeight, iline = prasSrc->iLinePixels;
+						fwrite(&iw, 4, 1, fs); fwrite(&ih, 4, 1, fs); fwrite(&iline, 4, 1, fs);
+						const unsigned char* ps1 = (const unsigned char*)prasSrc->pSurface;
+						for (int y = 0; y < ih; ++y)
+							fwrite(ps1 + y * iline, 1, iw, fs);
+						fclose(fs);
+					}
+					FILE* fp = fopen(szp, "wb");
+					if (fp && prasSrc->pxf.ppalAttached)
+					{
+						int n = prasSrc->pxf.ppalAttached->aclrPalette.uLen;
+						unsigned char rgb[256*3];
+						for (int k = 0; k < 256; ++k)
+						{
+							if (k < n) { CColour c = prasSrc->pxf.ppalAttached->aclrPalette.atArray[k];
+								rgb[k*3]=c.u1Red; rgb[k*3+1]=c.u1Green; rgb[k*3+2]=c.u1Blue; }
+							else { rgb[k*3]=0; rgb[k*3+1]=0; rgb[k*3+2]=0; }
+						}
+						fwrite(rgb, 1, sizeof(rgb), fp);
+						fclose(fp);
+					}
+				}
+			}
 		}
 
 		d3dstState.SetTexture(prasBest);
@@ -273,6 +335,10 @@ void RasterizeOpaque(CMArray<CRenderPolygon*>& appoly)
 				SD3DTable d3dt;
 				pclut->ConvertToD3D(d3dt, prv->cvIntensity);
 
+				if (s_opaqueDiag < 12 && i_vert == i_last_vert)
+					dprintf("OPAQUE[%d]: hash=%08x col=%08x spec=%08x lit=1 shade=1\n",
+						s_opaqueDiag++, (uint)prp->ptexTexture->u4HashValue, (uint)d3dt.u4Colour, (uint)d3dt.u4Specular);
+
 				// Copy the data to the TLVertex.
 				ptlv->sx       = prv->v3Screen.tX + CScreenRenderAuxD3D::fOffsetX;
 				ptlv->sy       = prv->v3Screen.tY + CScreenRenderAuxD3D::fOffsetY;
@@ -298,6 +364,10 @@ void RasterizeOpaque(CMArray<CRenderPolygon*>& appoly)
 			// Set colour levels.
 			SD3DTable d3dt;
 			pclut->ConvertToD3D(d3dt, prp->cvFace);
+
+			if (s_opaqueDiag < 12)
+				dprintf("OPAQUE[%d]: hash=%08x col=%08x spec=%08x lit=1 shade=0\n",
+					s_opaqueDiag++, (uint)prp->ptexTexture->u4HashValue, (uint)d3dt.u4Colour, (uint)d3dt.u4Specular);
 
 			// Add vertices.
 			int i_last_vert = Min(iMaxD3DVertices, int(prp->paprvPolyVertices.uLen)) - 1;
